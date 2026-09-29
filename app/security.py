@@ -1,5 +1,9 @@
 import base64
 import hashlib
+import hmac
+import secrets
+import time
+from collections import defaultdict, deque
 
 from argon2 import PasswordHasher
 from cryptography.fernet import Fernet
@@ -11,6 +15,39 @@ from app.config import get_settings
 from app.models import User
 
 _passwords = PasswordHasher()
+
+
+class InMemoryRateLimiter:
+    """Kleine Schutzschicht für einen einzelnen Prozess.
+
+    Für mehrere Web-Worker muss sie später durch Redis oder ein Gateway ersetzt
+    werden; sie verhindert aber bereits Brute-Force- und Kosten-Spitzen im
+    lokalen bzw. einzelnen Deployment.
+    """
+
+    def __init__(self) -> None:
+        self._requests: dict[str, deque[float]] = defaultdict(deque)
+
+    def allow(self, key: str, limit: int, window_seconds: int) -> bool:
+        now = time.monotonic()
+        requests = self._requests[key]
+        while requests and requests[0] <= now - window_seconds:
+            requests.popleft()
+        if len(requests) >= limit:
+            return False
+        requests.append(now)
+        return True
+
+
+rate_limiter = InMemoryRateLimiter()
+
+
+def new_csrf_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def csrf_matches(submitted: str | None, expected: str | None) -> bool:
+    return bool(submitted and expected and hmac.compare_digest(submitted, expected))
 
 
 def hash_password(password: str) -> str:

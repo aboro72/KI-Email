@@ -68,12 +68,17 @@ def fetch_imap_messages(host: str, port: int, username: str, password: str) -> l
             if not raw:
                 continue
             message = BytesParser(policy=policy.default).parsebytes(raw)
-            body = message.get_body(preferencelist=("plain", "html"))
+            text_part = message.get_body(preferencelist=("plain",))
+            html_part = message.get_body(preferencelist=("html",))
+            body = text_part or html_part
             messages.append({
                 "external_id": message.get("Message-ID") or f"imap:{username}:{uid.decode()}",
                 "sender": str(message.get("From", "")),
+                "recipients": str(message.get("To", "")),
                 "subject": str(message.get("Subject", "")),
                 "body": body.get_content() if body else "",
+                "html_body": html_part.get_content() if html_part else None,
+                "in_reply_to": str(message.get("In-Reply-To", "")),
                 "received_at": _parse_date(message.get("Date")),
             })
         connection.logout()

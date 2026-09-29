@@ -101,11 +101,13 @@ class EmailMessage(Base):
     sender: Mapped[str] = mapped_column(String(998))
     subject: Mapped[str] = mapped_column(String(998), default="")
     body_text: Mapped[str] = mapped_column(Text, default="")
+    body_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_category: Mapped[str | None] = mapped_column(String(80), nullable=True)
     ai_priority: Mapped[str | None] = mapped_column(String(20), nullable=True)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_reply_draft: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -204,3 +206,69 @@ class Activity(Base):
     subject: Mapped[str] = mapped_column(String(240), default="")
     body: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class HelpdeskCategory(Base):
+    __tablename__ = "helpdesk_categories"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    default_level: Mapped[int] = mapped_column(default=1)
+
+
+class KnowledgeArticle(Base):
+    __tablename__ = "knowledge_articles"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(240), index=True)
+    product: Mapped[str] = mapped_column(String(120), default="", index=True)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("helpdesk_categories.id"), nullable=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    content: Mapped[str] = mapped_column(Text)
+    keywords: Mapped[str] = mapped_column(String(500), default="")
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    category: Mapped[HelpdeskCategory | None] = relationship()
+
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticket_number: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    subject: Mapped[str] = mapped_column(String(500))
+    description: Mapped[str] = mapped_column(Text)
+    requester_email: Mapped[str] = mapped_column(String(320), default="")
+    requester_name: Mapped[str] = mapped_column(String(200), default="")
+    customer_number: Mapped[str] = mapped_column(String(80), default="", index=True)
+    requester_company: Mapped[str] = mapped_column(String(240), default="")
+    requester_phone: Mapped[str] = mapped_column(String(80), default="")
+    requester_address: Mapped[str] = mapped_column(Text, default="")
+    product: Mapped[str] = mapped_column(String(120), default="", index=True)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("helpdesk_categories.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="neu", index=True)
+    priority: Mapped[str] = mapped_column(String(20), default="normal", index=True)
+    support_level: Mapped[int] = mapped_column(default=1, index=True)
+    assigned_to_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    ai_summary: Mapped[str] = mapped_column(Text, default="")
+    ai_reply_draft: Mapped[str] = mapped_column(Text, default="")
+    ai_research_suggestion: Mapped[str] = mapped_column(Text, default="")
+    ai_confidence: Mapped[str] = mapped_column(String(20), default="")
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    category: Mapped[HelpdeskCategory | None] = relationship()
+    comments: Mapped[list["TicketComment"]] = relationship(back_populates="ticket", cascade="all, delete-orphan")
+
+
+class TicketComment(Base):
+    __tablename__ = "ticket_comments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("tickets.id"), index=True)
+    author_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    content: Mapped[str] = mapped_column(Text)
+    is_internal: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ticket: Mapped[Ticket] = relationship(back_populates="comments")

@@ -1,301 +1,196 @@
-# KI-Email – aktueller Projektstand und Verbesserungsideen
+# KI-Email – Projektstand, Risiken und nächster Ausbau
 
 Stand: 29.09.2026  
-Geprüfter Projektordner: `C:\Users\aborowczak\PycharmProjects\KI-Email`
+Codebasis geprüft: `C:\\Users\\User\\PycharmProjects\\KI-Email`
 
 ## Kurzfazit
 
-KI-Email ist aktuell ein funktionsfähiger, serverseitiger FastAPI-Arbeitsplatz für mehrere E-Mail-Konten. Der Schwerpunkt liegt auf einem sicheren, vom Menschen freigegebenen KI-Workflow: Nachrichten können analysiert werden, die KI kann Antwortentwürfe erzeugen, aber der Versand bleibt eine ausdrückliche Benutzeraktion.
+KI-Email ist ein funktionierender, serverseitiger FastAPI-Prototyp für mehrere E-Mail-Konten, KI-gestützte Entwürfe und einfache CRM-Arbeit. Die wichtigste Produktentscheidung ist bereits richtig umgesetzt: Die KI darf Inhalte analysieren und Entwürfe erzeugen, der Versand erfolgt nur durch eine ausdrückliche Benutzeraktion.
 
-Zusätzlich ist bereits ein CRM-Bereich für Firmen, Kontakte, Leads, Aktivitäten und öffentliche KI-Recherche vorhanden. Die technische Basis ist für einen internen Prototypen gut geeignet. Der größte nächste Qualitätssprung liegt weniger in weiteren Einzelaktionen, sondern in einer klareren Informationsarchitektur, einem echten E-Mail-Arbeitsfluss und einer belastbaren Produktionshärtung.
+Die Anwendung sollte jetzt **nicht** zuerst um weitere große Fachbereiche wachsen. Der beste nächste Schritt ist, den vorhandenen Mail- und CRM-Kern verlässlich, sicher und im Alltag schnell nutzbar zu machen. Erst danach lohnt sich ein optionales Helpdesk-Modul.
 
-Ein geplantes weiteres Kernmodul ist ein Helpdesk. Dieses soll nicht fest mit CRM oder Vertrieb verschmolzen werden, sondern als optionales Modul mit eigenen Daten, Berechtigungen, Ansichten und Einstellungen ergänzt werden können.
+Der aktuelle Code eignet sich für Entwicklung und kontrollierte interne Tests, aber noch nicht für einen ungehärteten Produktionsbetrieb.
 
-## Aktuell vorhanden
+## Tatsächlich vorhandener Funktionsumfang
+
+### Anmeldung, Rechte und Konten
+
+- Login mit signierter, HttpOnly-Session und Argon2id-Passwort-Hashes
+- Rollen und serverseitige Berechtigungsprüfung
+- Administratorverwaltung für Benutzer und E-Mail-Konten
+- Mehrere Konten pro Benutzer; Zugriffe werden im Backend geprüft
+- Schutz davor, den eigenen Benutzer oder den letzten Administrator zu löschen
+- verschlüsselte Ablage der Zugangsdaten für IMAP/SMTP, abgeleitet vom Anwendungs-Secret
 
 ### E-Mail und KI
 
-- Login, Sessions, Rollen und Berechtigungen
-- Mehrere IMAP/SMTP-Konten mit Benutzer-Zuordnung
-- Posteingang mit manueller Synchronisierung beim Öffnen/Aktualisieren
-- Speicherung von Nachrichten mit Duplikatprüfung
-- Lesen, Antworten und Weiterleiten
-- Neue E-Mails mit An, CC, BCC und Anhängen
-- Text- und HTML-Modus mit einfacher Formatierung
+- manueller IMAP-Abruf im Posteingang mit Duplikatprüfung über die `Message-ID`
+- gespeicherte Nachrichten mit Absender, Betreff, Text, Empfangszeit und Gelesen-Status
+- Lesen, Antworten, Weiterleiten und neue E-Mails
+- An, CC, BCC, Text-/HTML-Modus und Dateianhänge
+- einfache WYSIWYG-Formatierung inklusive eingebetteter Bilder
 - KI-Analyse mit Kategorie, Priorität, Zusammenfassung und Antwortentwurf
-- KI-Aktionen zum Kürzen sowie freundlicheren oder professionelleren Formulieren
-- sichtbare KI-Seitenleiste im Nachrichtenfenster
-- Audit-Protokollierung für relevante Benutzer-, KI- und Versandaktionen
-- Human-in-the-loop-Versandfreigabe als technisches Sicherheitsprinzip
+- KI-Aktionen zum Entwerfen, Kürzen sowie freundlicheren oder professionelleren Formulieren
+- Entwürfe und manuell bestätigter SMTP-Versand
+- Audit-Logs für relevante Benutzer-, KI- und Versandaktionen
 
 ### CRM
 
-- Firmen, Kontakte und Leads
-- Vertriebsrolle und `CRM_MANAGE`-Berechtigung
-- Quellen-URL, Recherchezeitpunkt, Opt-out, Lead-Status und Score
-- öffentliche Website-Recherche im Hintergrund
-- Recherche-Status `pending`, `running`, `completed`, `failed`
-- Duplikatprüfung für Firmen und Kontakte
-- Aktivitäten wie Notiz, Anruf, Termin und E-Mail
-- KI-generierte Verkaufstexte bleiben als überprüfbare Entwürfe gespeichert
+- Firmen, Kontakte, Leads und Aktivitäten
+- Vertriebsrolle mit `CRM_MANAGE`
+- Lead-Status, Score, nächste Aktion, Opt-out und Quellenangaben
+- Duplikatprüfungen für Firmen und Kontakte
+- öffentliche Website-Recherche; bei angegebener Website automatisch als FastAPI-Background-Task gestartet
+- sichtbarer Recherche-Status: `pending`, `running`, `completed`, `failed` oder `skipped`
+- KI-generierte Vertriebstexte bleiben Entwürfe; es gibt keinen automatischen Massenversand
 
-### Geplantes Helpdesk-Modul
+## Wichtigste Lücken und Risiken
 
-Das Helpdesk soll eingehende Anfragen in Tickets überführen und Supportteams bei der Bearbeitung unterstützen. Es ist ausdrücklich als optionales Modul vorgesehen, da nicht jeder Benutzer und nicht jede Installation Supportfunktionen benötigt.
+| Priorität | Beobachtung | Warum das zählt | Konkrete Maßnahme |
+| --- | --- | --- | --- |
+| P0 | `bedrock-long-term-api-key.csv` liegt im Arbeitsverzeichnis. Sie ist aktuell ignoriert und nicht als untracked Git-Datei sichtbar, bleibt aber ein sensibles lokales Secret. | Zugangsdaten können über Backups, Freigaben oder Fehlbedienung abfließen. | Inhalt und Berechtigungen prüfen. Bei echtem Schlüssel: rotieren; danach Secret-Store oder Umgebungsvariable verwenden. Keine Secrets in CSV, `.env`, Logs, Tests oder Dokumentation ablegen. |
+| P0 | Standardwerte für `secret_key` und Admin-Zugangsdaten sind entwicklungsgeeignet. | Ein versehentlicher Produktionsstart wäre angreifbar. | Start in Produktion ohne starke, gesetzte Secrets ablehnen; sichere Cookie- und Proxy-Konfiguration dokumentieren und testen. |
+| P0 | Zustandsändernde Formulare haben keinen erkennbaren CSRF-Schutz; Login, Versand, Admin- und CRM-Aktionen sind betroffen. | Fremde Seiten könnten Aktionen in einer bestehenden Sitzung auslösen. | CSRF-Middleware/Token für alle schreibenden Routen einführen und durch Tests absichern. |
+| P0 | HTML-Inhalte und eingebettete Bilder werden angenommen, ohne dass eine zentrale Sanitization-Strategie sichtbar ist. | XSS, sehr große Mails und riskante Inhalte können Benutzer oder System belasten. | Eingehendes und ausgehendes HTML mit Allowlist bereinigen; Data-URLs, Größe und MIME-Typ begrenzen; HTML in der Anzeige isolieren. |
+| P1 | `_fetch_public_website` sperrt nur einige lokale Adressen. Redirects, IPv6-Sonderbereiche, weitere private Netze und DNS-Rebinding sind nicht vollständig abgedeckt. | Die Recherche kann für SSRF missbraucht werden. | URL nach jedem Redirect auflösen und gegen vollständige private/reservierte IP-Bereiche prüfen; nur HTTP(S), kurze Timeouts, Größenlimits und ausgehenden Netzwerkzugriff einschränken. |
+| P1 | IMAP, KI-Recherche und KI-Analyse laufen synchron bzw. als prozesslokale `BackgroundTasks`. | Web-Worker können blockieren; Jobs gehen bei Neustart verloren und haben keinen Retry. | Persistente Job-Queue mit Status, Retry, Backoff, Abbruch und Fehleranzeige einführen. |
+| P1 | Schemaänderungen werden beim Start per SQLite-`ALTER TABLE` erledigt. | Das ist nicht versionssicher, schwer prüfbar und nicht PostgreSQL-tauglich. | Alembic-Migrationen einführen; Startcode nur noch für Initialdaten verwenden. |
+| P1 | Uploads haben zwar einen Hinweis auf 10 MB pro Datei, aber keine zentral erzwingbare Richtlinie für Anzahl, Gesamtgröße, Inhalt und Malware-Prüfung. | Speicherverbrauch und schädliche Anhänge sind nicht ausreichend kontrolliert. | Serverseitige Limits, Quarantäne/Scan, sichere Dateinamen und kontrollierte Download-Auslieferung ergänzen. |
+| P1 | Es gibt weder Rate-Limits noch ein einheitliches Fehler-/Validierungskonzept. | Brute Force, Kostenrisiko bei KI und schwer nachvollziehbare Fehler. | Limits für Login, Versand, Synchronisierung, Recherche und KI; strukturierte Logs mit Korrelations-ID und ohne Geheimnisse. |
+| P2 | `document.execCommand` ist veraltet. | Der Editor wird langfristig schwer wartbar und unsicherer zu kapseln. | Editor hinter einer klaren Komponente abstrahieren; erst dann gezielt ersetzen. |
 
-Vorgesehene Funktionen:
+## Produktlücken mit dem größten Nutzen
 
-- Tickets aus E-Mails, Formularen und manueller Anlage
-- Ticketnummer, Betreff, Beschreibung, Status, Priorität und Kategorie
-- Zuordnung zu Benutzer, Team, Firma und Kontakt
-- öffentliche Antworten und interne Notizen
-- Verlauf aller Nachrichten und Statusänderungen als Timeline
-- Anhänge und relevante E-Mail-Referenzen
-- SLA-Zeiten, Fälligkeit, Wiedervorlage und Eskalation
-- Vorlagen und Makros für wiederkehrende Antworten
-- KI-Unterstützung für Klassifikation, Zusammenfassung und Antwortentwürfe
-- Wissensdatenbank bzw. verlinkte Lösungshilfen
-- Auswertungen zu offenen Tickets, Antwortzeit, Lösungszeit und SLA-Einhaltung
-- Auditierbarkeit sowie klarer manueller Versand durch Mitarbeitende
+### E-Mail zum täglichen Arbeitsplatz machen
 
-### Technik und Qualität
+Der Posteingang ist technisch vorhanden, aber noch keine leistungsfähige Arbeitsansicht. Vor dem Ausbau um neue Module sollten diese Fähigkeiten kommen:
 
-- FastAPI mit serverseitig gerenderten Jinja-Templates
-- SQLAlchemy mit SQLite in der Entwicklung und vorbereiteter PostgreSQL-Perspektive
-- Argon2id für Passwörter, HttpOnly-Sessions und verschlüsselte Mailbox-Passwörter
-- responsive, helle Oberfläche mit gemeinsamer CSS-Basis
-- aktueller Teststand: **4 Tests erfolgreich** (`pytest -q`)
+1. Suche und Filter nach Konto, Absender, Betreff, ungelesen, Zeitraum, KI-Priorität und Anhängen.
+2. Konversationsansicht über `Message-ID`, `In-Reply-To` und `References`; gesendete Antworten, Anhänge und Entwürfe in einer Timeline.
+3. Klare Bearbeitungszustände: gelesen/ungelesen, wichtig, archiviert, gelöscht und Follow-up.
+4. Entwurfsautosave mit sichtbarem Speicherzeitpunkt sowie Wiederaufnahme abgebrochener Antworten.
+5. Serverseitig validierte Empfänger-Chips; Warnung für externe Empfänger und Versand-Review mit Konto, Empfängern, Inhalt und Anhängen.
+6. Echte Dashboard-Kennzahlen statt Platzhalter: ungelesene Nachrichten, fehlgeschlagene Synchronisierungen, offene Entwürfe und überfällige Aufgaben.
 
-## Beobachtungen zur aktuellen Nutzung
+### CRM vom Datensatz zur Arbeitssteuerung entwickeln
 
-### Stärken
+- Firmen-Detailseite als 360°-Ansicht für Kontakte, Leads, Quellen, Recherche und Aktivitäten.
+- Aufgaben mit Eigentümer, Fälligkeit, Erinnerung und Abschluss statt eines Freitextfelds „nächste Aktion“.
+- Listen mit Suche, Filtern und gespeicherten Ansichten; danach eine einfache Kanban-Pipeline.
+- Opt-out-/Sperrstatus beim Kontakt, beim Lead und unmittelbar vor einer Ansprache prominent anzeigen.
+- Import/Export erst nach Duplikatvorschau, Fehlerbericht und klaren Berechtigungen ergänzen.
+- Bei KI-Recherche Quellen, Abrufzeit, Unsicherheit und menschlichen Prüfstatus getrennt speichern.
 
-- Die zentrale Sicherheitsidee ist verständlich und sichtbar: KI erstellt Vorschläge, der Mensch entscheidet.
-- Multi-Account-Zugriffe werden serverseitig geprüft.
-- Die Kernbereiche Dashboard, Posteingang, E-Mail-Verfassen, CRM und Administration sind bereits als End-to-End-Flows angelegt.
-- Recherche und Verkaufstexte sind nachvollziehbar mit Quelle und Status versehen.
-- Die Oberfläche ist leichtgewichtig, schnell verständlich und auf kleinen Bildschirmen grundsätzlich nutzbar.
+### Bedienoberfläche fokussieren
 
-### Aktuelle Reibungspunkte
+- Gemeinsame App-Shell mit konsistenter Hauptnavigation, Seitenkopf und einer klaren primären Aktion pro Seite.
+- Dreispaltiger Mail-Arbeitsbereich: Konto/Ordner, Nachrichtenliste, Detail/KI-Kontext; mobil als aufeinanderfolgende Ansichten.
+- Einheitliche Status-Badges für Fehler, laufende Jobs, Erfolg, KI-Vorschlag und Opt-out.
+- Formulare in überschaubare Abschnitte oder Tabs teilen; Fehler direkt am Feld anzeigen.
+- Zugänglichkeit als Akzeptanzkriterium: Labels, Tastaturbedienung, sichtbarer Fokus, ausreichender Kontrast und verständliche Fehlermeldungen.
 
-- Lange Seiten bündeln viele Formulare und Listen. Besonders CRM und Administration wirken dadurch eher wie technische Verwaltungsseiten als wie tägliche Arbeitsoberflächen.
-- Im Posteingang fehlen sichtbare Filter, Suche, Sortierung, Ordner/Labels, ungelesene Hervorhebung und Sammelaktionen.
-- E-Mail-Threads, Anhänge und gesendete Nachrichten sind noch nicht als zusammenhängender Gesprächsverlauf dargestellt.
-- Erfolgs- und Fehlermeldungen erscheinen überwiegend nur nach einem Seitenwechsel; bei KI-Recherche und Synchronisierung fehlt ein stärkeres Live-Feedback.
-- Das Dashboard zeigt teilweise feste Platzhalterwerte, zum Beispiel `0` für ungelesene Nachrichten und KI-Kosten.
-- Entwürfe aus Antworten und neue Nachrichten sind funktional vorhanden, aber noch nicht als dauerhafte, automatisch gespeicherte Entwurfsverwaltung ausgebaut.
-- Die Navigation ist je nach Template nicht vollständig einheitlich; CRM und Administration sollten als klarer Hauptbereich bzw. Einstellungsbereich erkennbar sein.
-- Die HTML-Editor-Interaktion basiert auf `document.execCommand`, was langfristig durch einen robusteren Editor oder eine sauber gekapselte Editor-Komponente ersetzt werden sollte.
+## Empfohlener Umsetzungsplan
 
-## Optische Verbesserungen
+### Etappe 0 – Sicherheitsbasis (vor einem breiteren Testbetrieb)
 
-### Priorität A – Orientierung und Dichte
+- Secret-Datei prüfen und gegebenenfalls Schlüssel rotieren.
+- produktionssichere Konfiguration verpflichtend machen.
+- CSRF-Schutz, Rate-Limits und serverseitige Eingabevalidierung ergänzen.
+- HTML-/Anhangsrichtlinie und SSRF-Schutz umsetzen.
+- Tests für Berechtigungen, Konto-Zuordnung, Versand-Gate, Opt-out, CSRF und fehlerhafte Provider-Verbindungen ergänzen.
 
-1. **Einheitliches App-Layout:** gemeinsame Shell mit Sidebar oder kompakter Hauptnavigation, Breadcrumbs, Seitenkopf und kontextabhängigen Aktionen.
-2. **E-Mail-Zweispaltenansicht:** links Ordner/Konten, mittig Nachrichtenliste, rechts Vorschau bzw. KI-Kontext. Auf Mobilgeräten wird daraus eine klare Schrittfolge.
-3. **Visuelle Zustände:** ungelesen, wichtig, Fehler, in Bearbeitung, erfolgreich und KI-Entwurf mit konsistenten Farben, Icons und Textlabels darstellen.
-4. **Bessere Listen:** Tabellen oder kompakte Karten mit festen Spalten für Absender, Betreff, Zeit, Status und Aktionen; lange Inhalte nicht unkontrolliert in den Vordergrund rücken.
-5. **Formulare gruppieren:** Mailkonto, Benutzer, Sicherheit und Audit im Admin-Bereich als Tabs oder einklappbare Abschnitte organisieren. CRM entsprechend in Firmen, Kontakte, Leads und Aktivitäten gliedern.
+**Fertig, wenn:** Ein nicht berechtigter Benutzer weder Daten eines fremden Kontos sieht noch sendet; schreibende Browser-Anfragen ohne CSRF-Token scheitern; Geheimnisse werden nicht protokolliert.
 
-### Priorität B – Lesbarkeit und Vertrauen
+### Etappe 1 – Betriebssicherheit und Beobachtbarkeit
 
-1. Typografie für Betreff, Absender, Vorschautext und Zeit stärker hierarchisieren.
-2. Primäre Aktionen pro Seite auf eine klare Hauptaktion reduzieren; destruktive Aktionen räumlich und farblich eindeutig absetzen.
-3. Für KI-Inhalte ein eigenes, ruhiges Farbsystem mit Kennzeichnung „Vorschlag – bitte prüfen“ verwenden.
-4. Leere Zustände informativer gestalten, jeweils mit kurzer Erklärung und nächster sinnvollen Aktion.
-5. Toasts bzw. Inline-Rückmeldungen ergänzen und Fehler direkt am betroffenen Formular anzeigen.
-6. Tastaturfokus, Kontrast, sichtbare Fokusrahmen, Labels und Fehlermeldungen nach WCAG-Grundsätzen prüfen.
+- Alembic-Migrationen, PostgreSQL-Konfiguration, Backup-/Restore-Test und Aufbewahrungsregeln.
+- Persistente Job-Queue für Synchronisierung, Recherche und KI mit Retry/Backoff.
+- strukturierte Logs, Korrelations-IDs, Fehlerstatus sowie ein kleines Betriebs-Dashboard.
+- Zeitüberschreitungen, Abbruch und nachvollziehbare Fehlermeldungen für externe Dienste.
 
-### Priorität C – Politur
+**Fertig, wenn:** Ein Neustart keinen laufenden Job unbemerkt verliert und ein fehlgeschlagener Job gezielt erneut gestartet werden kann.
 
-- konsistente Icons für Posteingang, Entwurf, KI, CRM und Einstellungen
-- Skeleton- oder Ladezustände bei Synchronisierung und Recherche
-- Avatar bzw. Initialen für Absender und Benutzer
-- Dark Mode als optionale Benutzereinstellung
-- kompakte Schnellaktionen mit Tooltips
-- zentrale Design-Tokens für Farben, Abstände, Radien und Schatten statt Einzelwerte in Templates
+### Etappe 2 – Mail-Workflow
 
-## Verbesserungen der Handhabung
+- Suche, Filter, Sortierung, ungelesene Zustände und Sammelaktionen.
+- Thread-Modell, Anhänge und Versandhistorie.
+- Entwurfsautosave, Empfängerprüfung und finaler Versanddialog.
+- echte Kennzahlen im Dashboard.
 
-### E-Mail-Arbeitsablauf
+**Fertig, wenn:** Eine neue Nachricht binnen Sekunden gefunden, verstanden, beantwortet und sicher versendet werden kann, ohne zwischen unverbundenen Seiten zu wechseln.
 
-- Volltextsuche über Betreff, Absender und Nachrichtentext
-- Filter für ungelesen, Priorität, Kategorie, Zeitraum, Konto und Anhänge
-- Markieren als gelesen/ungelesen, wichtig, archiviert und gelöscht
-- Favoriten bzw. Follow-up-Markierung
-- Sammelauswahl für mehrere Nachrichten
-- echte Ordner- und Label-Unterstützung
-- Konversationen über `Message-ID`, `In-Reply-To` und `References` zu Threads zusammenfassen
-- Anhänge anzeigen, herunterladen, weiterleiten und sicher speichern
-- gesendete E-Mails und lokale Entwürfe im gleichen Arbeitsbereich auffindbar machen
-- automatische Entwurfsspeicherung mit „zuletzt gespeichert um …“
-- Empfänger-Chips statt Freitext; Adressvalidierung sowie sichtbare Warnung bei externen Empfängern
-- Versanddialog mit Zusammenfassung von Konto, Empfängern, Anhängen und finaler Bestätigung
+### Etappe 3 – CRM-Workflow und UI-Konsolidierung
 
-### Helpdesk-Arbeitsablauf
+- Firmen- und Lead-Detailansichten, Aufgaben/Wiedervorlagen und Aktivitäten-Timeline.
+- konsistente Navigation und Listen; mobile Detailansichten.
+- Quellen- und Opt-out-Prüfung im gesamten Kontaktprozess.
 
-- Ticketliste mit Suche, Filtern, Status, Priorität, Zuständigkeit und Fälligkeit
-- Ticketdetailseite mit vollständiger Timeline, internen Notizen und Antworteditor
-- Ticketstatus wie `neu`, `offen`, `wartet_auf_kunde`, `in_bearbeitung`, `gelöst` und `geschlossen`
-- automatische Erkennung von Antworten anhand von Ticketnummer und E-Mail-Referenzen
-- Zusammenführen und Aufteilen von Tickets mit nachvollziehbarer Historie
-- „Übernehmen“, „zuweisen“, „eskalieren“ und „zurückstellen“ als eindeutige Aktionen
-- Kundenantwort vor dem Versand prüfen und bei Bedarf durch KI vorbereiten lassen
-- SLA-Warnungen und Wiedervorlagen im Dashboard anzeigen
-- CRM-Verknüpfung nur optional: ein Ticket kann, muss aber nicht, einer Firma oder einem Kontakt zugeordnet sein
+**Fertig, wenn:** Vertrieb einen Lead vom Rechercheergebnis bis zur nächsten geprüften Aktion durchgehend bearbeiten kann.
 
-### KI-Bedienung
+### Etappe 4 – KI-Transparenz
 
-- KI-Aktionen als Dropdown oder Aktionsleiste bündeln, damit die Seitenleiste nicht überladen wird
-- gewünschte Tonalität, Sprache, Länge und Zielgruppe als Auswahl anbieten
-- Änderungen des KI-Entwurfs gegenüber dem vorherigen Entwurf visualisieren
-- Antwortentwurf direkt im Editor einfügen, ersetzen oder als neue Variante übernehmen können
-- Quellen und Unsicherheiten bei Rechercheergebnissen sichtbar machen
-- KI-Ausgaben versionieren und wiederherstellen können
-- Nutzung, Kosten, Modell und Laufzeit pro Anfrage nachvollziehbar anzeigen
-- Abbruch, Retry und verständliche Fehlerzustände bei langen KI-Aufgaben
+- Tonalität, Sprache und Länge als kontrollierte Auswahl.
+- Varianten und Versionen von KI-Entwürfen; Übernahme, Vergleich und Wiederherstellung.
+- Modell, Laufzeit, Kosten/Token und Fehlerzustand pro Anfrage erfassen.
+- zentral versionierte Prompts mit Tests und Freigabeprozess.
 
-### CRM-Bedienung
+**Fertig, wenn:** Jeder KI-Inhalt als überprüfbarer Vorschlag erkennbar, einem Modell/Prompt zuordenbar und vor Versand editierbar ist.
 
-- Listenansicht mit Suche, Filtern und gespeicherten Ansichten
-- Firmen-Detailseite als zentrale 360°-Ansicht mit Kontakten, Leads, Aktivitäten und Recherche
-- Pipeline/Kanban für Leads mit Drag-and-drop oder klaren Statusaktionen
-- nächste Aktion und Fälligkeit als echte Aufgaben statt nur als Freitext
-- Opt-out- und Sperrstatus an jeder Kontaktstelle prominent anzeigen
-- Quellen, Abrufdatum und Vertrauens-/Prüfstatus an Rechercheergebnissen darstellen
-- Kontakte aus einem Lead heraus direkt anschreiben, ohne Daten erneut einzugeben
-- Import/Export mit Duplikatvorschau und Fehlerbericht
+## Optionales Helpdesk-Modul – erst nach Etappe 2
 
-## Allgemeine Erweiterungsvorschläge
+Helpdesk sollte kein Umbau des CRM werden, sondern ein unabhängig aktivierbares Modul. Es darf CRM und Mail integrieren, aber nicht von ihnen abhängig sein.
 
-### Kurzfristig – hoher Nutzen
+### Startumfang
 
-1. CSRF-Schutz für alle zustandsverändernden Formulare.
-2. Rate-Limits für Login, KI-Aktionen, Recherche und Versand.
-3. Serverseitige Validierung und einheitliches Fehlerformat für E-Mail-Adressen, Empfängerlisten, Uploads und HTML-Inhalte.
-4. Zentrale Flash-/Toast-Komponente mit Erfolg, Warnung und Fehler.
-5. Echte Dashboard-Kennzahlen aus der Datenbank statt Platzhalter.
-6. Zusätzliche Tests für Berechtigungen, Versand-Gate, Opt-out-Sperren, Kontozuordnung und fehlerhafte Provider-Verbindungen.
-7. Datenbankmigrationen mit Alembic anstelle von ad-hoc SQLite-Spaltenänderungen beim Start.
-8. strukturierte Logs ohne Geheimnisse und mit Korrelations-ID pro Anfrage.
+- Tickets aus E-Mail, Formular und manueller Anlage
+- Ticketnummer, Status, Priorität, Kategorie, Team, Zuständigkeit, Fälligkeit und SLA
+- Ticketdetail mit Timeline aus öffentlichen Antworten, internen Notizen, Anhängen und Statuswechseln
+- eindeutige Aktionen: übernehmen, zuweisen, zurückstellen, eskalieren und schließen
+- Suche und Filter nach Status, Priorität, Team, Bearbeiter und Fälligkeit
+- KI nur für Klassifikation, Zusammenfassung und Antwortentwürfe; der Mensch bleibt Versandinstanz
 
-### Mittelfristig – Arbeitsfähigkeit im Alltag
+### Späterer Ausbau
 
-- Hintergrundjobs mit Queue, Retry, Backoff und Status für IMAP-Synchronisierung, KI und Recherche
-- WebSocket oder Polling für Fortschritt und neue Nachrichten
-- OAuth für unterstützte Mailanbieter statt ausschließlich Benutzername/Passwort
-- PostgreSQL, Backup-/Restore-Konzept und Aufbewahrungsregeln
-- Benutzereinstellungen für Signatur, Zeitzone, Sprache, Standardkonto und KI-Tonalität
-- Vorlagen für wiederkehrende Antworten und Vertriebsnachrichten
-- Kalender-/Terminmodul und Wiedervorlagen
-- Benachrichtigungen für neue Nachrichten, fehlgeschlagene Synchronisierung und fällige Leads
-- Export von Audit-Logs und revisionssichere Aufbewahrungsregeln
-- Helpdesk-Modul mit Ticketing, Zuständigkeiten, SLA, Vorlagen und Support-Dashboard
+- Ticket-Zusammenführung/-Aufteilung mit vollständiger Historie
+- SLA-Warnungen, Wiedervorlagen, Vorlagen/Makros und Wissensbasis
+- Reporting zu Erstreaktion, Lösung, Backlog und SLA-Einhaltung
+- weitere Kanäle wie Formular, Chat oder Telefonnotiz
 
-### Langfristig – Plattformperspektive
+## Modulare Architektur
 
-- Provider-Abstraktion mit mehreren KI-Modellen und Fallbacks
-- Modell-/Prompt-Verwaltung mit Freigabeprozess und Testfällen
-- Mandantenfähigkeit, falls mehrere Firmen getrennt verwaltet werden sollen
-- feinere Rollen wie Support, Vertrieb, Prüfer und Administrator
-- Spam-/Phishing-Hinweise mit erklärbaren Signalen
-- automatische Zusammenfassung längerer Threads
-- Reporting zu Antwortzeit, Lead-Konversion, KI-Nutzung und Versandvolumen
-- Helpdesk-Kanäle wie Webformular, E-Mail, später Chat oder Telefonnotiz
-- Mandanten- und Teamregeln für getrennte Supportbereiche
-- API für Integrationen sowie Webhooks
-- revisionssichere Archivierung und definierte Datenschutz-/Löschkonzepte
-
-## Sicherheits- und Betriebsrisiken
-
-### Dringend prüfen
-
-- Im Projektordner liegt eine Datei `bedrock-long-term-api-key.csv`. Da sie laut Git-Status als neue Datei erkannt wird, muss geprüft werden, ob darin ein echter Schlüssel enthalten ist. Falls ja: Schlüssel sofort widerrufen/rotieren, Datei aus Git und Arbeitskopie entfernen und die Historie auf Secret-Leaks prüfen. Zugangsdaten niemals in CSV, `.env`-Dateien oder Logs versionieren.
-- Produktionsbetrieb sollte nicht auf SQLite und dem Entwicklungsserver basieren.
-- CSRF, Rate-Limits, Secret-Management und sichere Cookie-/Proxy-Konfiguration fehlen noch als klar abgeschlossene Produktionsmaßnahmen.
-- HTML-E-Mail-Inhalte und eingebettete Bilder brauchen eine strenge Sanitization- und Größenstrategie.
-- Website-Recherche sollte zusätzlich SSRF-Schutz für DNS-Rebinding, Redirects und weitere private Adressbereiche erhalten.
-- Anhänge benötigen Allow-/Deny-Regeln, Größenlimits insgesamt, Malware-Prüfung und sichere Auslieferung.
-
-## Empfohlene Reihenfolge
-
-### Etappe 1 – Stabilität und Sicherheit
-
-CSRF, Rate-Limits, Secret-Bereinigung, einheitliche Validierung, Fehlerbehandlung, Datenbankmigrationen und Tests für sicherheitsrelevante Flows.
-
-### Etappe 2 – E-Mail als täglicher Arbeitsplatz
-
-Threads, Suche, Filter, ungelesene Zustände, Ordner/Labels, Anhänge, Entwurfsautosave und echte Dashboard-Kennzahlen.
-
-### Etappe 3 – Bedienoberfläche neu strukturieren
-
-Gemeinsames Layout, Zweispalten-Posteingang, bessere Listen, klare Statusdarstellung, kompakte Formulare und mobile Detailansichten.
-
-### Etappe 4 – Hintergrundverarbeitung und Transparenz
-
-Job-Queue, Fortschrittsanzeige, Retry, Kosten-/Tokenübersicht, Modell-/Prompt-Versionierung und nachvollziehbare KI-Historie.
-
-### Etappe 5 – CRM vom Datensatz zur Pipeline
-
-Firmen-Detailseite, Lead-Kanban, Aufgaben/Wiedervorlagen, Aktivitäten-Timeline, Import/Export und Vertriebs-Dashboard.
-
-### Etappe 6 – Optionales Helpdesk-Modul
-
-Ticketmodell, Ticketliste und Detail-Timeline als eigenständigen Bereich umsetzen. Danach E-Mail-Import, Zuständigkeiten, SLA/Wiedervorlagen, Vorlagen und Helpdesk-Auswertungen ergänzen. CRM-Verknüpfungen und KI-Funktionen werden über optionale Integrationen aktiviert.
-
-## Modulare Produktarchitektur
-
-Damit Installationen schlank bleiben und Benutzer nur benötigte Funktionen sehen, sollte jedes Fachmodul unabhängig aktivierbar sein.
-
-### Empfohlene Modulgrenzen
-
-| Modul | Kernaufgabe | Abhängigkeiten |
+| Modul | Aufgabe | Voraussetzung |
 | --- | --- | --- |
-| Core | Login, Benutzer, Rollen, Berechtigungen, Einstellungen, Audit | keine |
-| Mail | Konten, Synchronisierung, Posteingang, Versand, Entwürfe | Core |
-| KI | Provider, Modelle, Prompts, KI-Anfragen, Kosten | Core; Mail/CRM/Helpdesk optional |
-| CRM | Firmen, Kontakte, Leads, Aktivitäten | Core; Mail/KI optional |
+| Core | Benutzer, Rollen, Berechtigungen, Einstellungen, Audit, Jobs | keine |
+| Mail | Konten, Synchronisierung, Nachrichten, Entwürfe, Versand | Core |
+| KI | Provider, Modelle, Prompts, Ausführungen und Kosten | Core; nutzbar durch Fachmodule |
+| CRM | Firmen, Kontakte, Leads, Aufgaben, Aktivitäten | Core; Mail/KI optional |
 | Helpdesk | Tickets, Teams, SLA, Support-Timeline, Wissensbasis | Core; Mail/KI/CRM optional |
-| Reporting | Kennzahlen, Exporte und Auswertungen | Core; ausgewählte Fachmodule optional |
+| Reporting | Kennzahlen, Exporte, Aufbewahrung | Core; Daten aus aktiven Modulen |
 
-### Regeln für die Modularität
+Regeln dafür:
 
-- Module erhalten eigene Python-Pakete, Templates, Styles und Routen; `main.py` sollte nur die Module registrieren.
-- Jedes Modul definiert eigene Datenmodelle und Migrationen, statt Tabellen ungeordnet im Kern zu verteilen.
-- Aktivierte Module werden zentral in Konfiguration oder Datenbank verwaltet.
-- Navigation, Dashboard-Karten, Berechtigungen und Einstellungen zeigen nur aktivierte Module.
-- Berechtigungen werden je Modul gruppiert, zum Beispiel `HELPDESK_VIEW`, `HELPDESK_MANAGE`, `HELPDESK_ASSIGN` und `HELPDESK_ADMIN`.
-- Optionale Verknüpfungen laufen über klar definierte Services oder Events, nicht über direkte Querzugriffe auf interne Tabellen.
-- Das Abschalten eines Moduls blendet die Oberfläche aus und verhindert neue Aktionen; vorhandene Daten bleiben erhalten, bis eine ausdrücklich geplante Archivierungs- oder Löschroutine ausgeführt wird.
-- Abhängigkeiten werden beim Aktivieren geprüft. Beispielsweise kann Helpdesk ohne CRM laufen, während eine optionale CRM-Verknüpfung erst bei aktiviertem CRM erscheint.
-- KI bleibt eine Fähigkeit, die ein Modul verwenden kann, aber keine Voraussetzung für die Nutzung des Moduls ist.
+- Jedes Modul besitzt eigene Routen, Services, Modelle, Migrationen und Tests.
+- Fachmodule greifen über klar definierte Services oder Events aufeinander zu, nicht direkt auf interne Tabellen.
+- Konfiguration steuert aktivierte Module; Navigation, Berechtigungen und Dashboard-Karten folgen dieser Konfiguration.
+- Beim Deaktivieren wird ein Modul ausgeblendet und neue Verarbeitung gestoppt. Daten bleiben erhalten, bis eine explizite Archivierungs- oder Löschregel greift.
+- KI ist eine optionale Fähigkeit, keine Voraussetzung für Mail, CRM oder Helpdesk.
 
-### Beispiel für optionale Installationen
+## Messbare Qualitätsziele für den nächsten Meilenstein
 
-- **Klein:** Core + Mail
-- **E-Mail mit KI:** Core + Mail + KI
-- **Vertrieb:** Core + Mail + CRM + KI
-- **Support:** Core + Mail + Helpdesk
-- **Support und Vertrieb:** Core + Mail + CRM + Helpdesk + KI
+- Alle schreibenden Routen sind gegen CSRF geschützt und relevante Limits sind getestet.
+- E-Mail- und CRM-Berechtigungen sind für erlaubte und verbotene Fälle automatisiert geprüft.
+- Jede asynchrone Aufgabe hat Status, Fehlergrund, Retry und Audit-Spur.
+- Ein Mail-Thread zeigt Original, Antworten, Anhänge und Entwürfe vollständig in einer Ansicht.
+- Der Versandreview zeigt Absenderkonto, alle Empfänger, Betreff, Inhalt und Anhänge vor der finalen Bestätigung.
+- Dashboard-Zahlen stammen aus der Datenbank und sind nicht statisch.
+- Der Testbestand deckt die sicherheitskritischen Flows ab und läuft in der Projektumgebung reproduzierbar.
 
-So bleibt die Anwendung für einfache Installationen übersichtlich, kann aber bei Bedarf zu einer umfassenden Kommunikations- und Supportplattform wachsen.
+## Verifikation dieses Stands
 
-## Definition of Done für den nächsten größeren Meilenstein
-
-- Ein Benutzer findet eine neue Nachricht innerhalb weniger Sekunden über Konto, Suche oder Filter.
-- Ein Thread zeigt Original, Antworten, Anhänge und Status vollständig zusammenhängend.
-- Ein KI-Vorschlag ist eindeutig als Vorschlag markiert, versionierbar und vor dem Versand editierbar.
-- Jeder Versand zeigt Empfänger, Konto, Inhalt und Anhänge in einer finalen Bestätigung.
-- Fehlgeschlagene Synchronisierungen und KI-Aufgaben sind sichtbar, wiederholbar und auswertbar.
-- CRM-Nutzer können einen Lead vom Erstkontakt bis zur nächsten Aufgabe ohne Umwege bearbeiten.
-- Sicherheitskritische Aktionen sind geschützt, protokolliert und durch automatisierte Tests abgedeckt.
-
-## Technischer Prüfstand
-
-Zum Erstellungszeitpunkt wurden die vorhandenen Tests ausgeführt:
+Die vorhandene Testsuite wurde in der lokalen virtuellen Umgebung ausgeführt:
 
 ```text
-4 passed in 1.20s
+4 passed in 2.41s
 ```
 
-Diese Datei ist eine fachliche Bestandsaufnahme und kein Ersatz für eine vollständige Sicherheitsprüfung oder einen Usability-Test mit echten Anwendern.
+Die vier Tests sind ein guter Smoke-Test, aber noch kein Sicherheits-, Last- oder Usability-Nachweis. Vor einem Produktivbetrieb sind insbesondere die Punkte aus Etappe 0 und Etappe 1 zwingend.

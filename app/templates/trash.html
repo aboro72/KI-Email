@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Papierkorb · AboroDesk Developer</title><link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header><a class="brand" href="/">AboroDesk Developer</a><nav><a href="/inbox">Posteingang</a><a href="/trash">Papierkorb</a><a href="/dashboard">Dashboard</a></nav></header>
+<main class="shell">
+  <div class="intro"><div><span class="eyebrow">E-Mail</span><h1>Papierkorb</h1><p>Nachrichten können zurück in den Posteingang verschoben oder endgültig aus AboroDesk entfernt werden.</p></div><a class="button secondary" href="/inbox">Zum Posteingang</a></div>
+  <section class="panel">
+    {% for item in messages %}
+      <div class="mail-row"><span><strong>{{ item.subject or '(ohne Betreff)' }}</strong><br><small>{{ item.sender }}</small></span><div class="actions"><form method="post" action="/inbox/{{ item.id }}/restore"><button class="button secondary">In Posteingang verschieben</button></form><form method="post" action="/inbox/{{ item.id }}/destroy" onsubmit="return confirm('Diese E-Mail wird endgültig aus AboroDesk entfernt. Fortfahren?')"><button class="button">Endgültig löschen</button></form></div></div>
+    {% else %}
+      <div class="empty-state"><h2>Papierkorb ist leer</h2></div>
+    {% endfor %}
+  </section>
+</main>
+</body>
+</html>
