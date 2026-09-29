@@ -1,113 +1,79 @@
 # Entwicklungsstand
 
-## Aktueller Stand: Phase 1 abgeschlossen
+Zuletzt aktualisiert: 29.09.2026
 
-Zuletzt aktualisiert: 24.09.2026, nach Vorbereitung des Gmail-OAuth-Imports
+## Erledigt
 
-## Kurz gesagt
+- FastAPI-Anwendung mit Login, Sessions, Rollen und Berechtigungen
+- Administrator-Verwaltung: Benutzer anlegen, bearbeiten, Passwörter ändern und löschen
+- Sicherheitsprüfung: letzter Admin und eigener Benutzer können nicht gelöscht werden
+- Viele-zu-viele-Zuordnung zwischen Benutzern und E-Mail-Konten
+- Zugriffsschutz: Benutzer sehen und synchronisieren nur zugeordnete Konten
+- IMAP-Empfang beim Öffnen/Aktualisieren des Posteingangs
+- Speicherung von Nachrichten in `EmailMessage` inklusive Duplikatprüfung
+- Helle, responsive Oberfläche mit sichtbarer Navigation
+- Bedrock-Anbindung über `eu.anthropic.claude-sonnet-4-6`
+- KI-Analyse neuer Nachrichten: Kategorie, Priorität, Zusammenfassung und Antwortentwurf
+- Sichtbare KI-Seitenleiste im Nachrichtenfenster
+- KI-Aktionen: analysieren, Antwort entwerfen, kürzen, freundlicher und professioneller formulieren
+- Antworteditor direkt an der Nachricht
+- Antwort als Entwurf speichern
+- Manueller SMTP-Versand nach ausdrücklicher Bestätigung
+- Neues E-Mail-Fenster mit An, CC und BCC
+- Antworten und Weiterleiten über den gemeinsamen Editor
+- Text- und HTML-Modus mit einfacher WYSIWYG-Formatierung
+- Erweiterte Formatierung: Schriftarten, Größen, Farben, Hervorhebung, Ausrichtung, Listen und Links
+- Bilder direkt im HTML-Editor einfügen
+- Mehrere Anhänge bis 10 MB pro Datei
+- Audit-Logs für Benutzeränderungen, KI-Entwürfe und Antworten
+- API-Key-Datei gegen Git-Commits abgesichert
+- 4 automatisierte Tests erfolgreich
 
-Die Anwendung kann gestartet werden. Ein Administrator kann sich anmelden und im Admin-Dashboard die ersten IMAP-/SMTP-E-Mail-Konten speichern. Die Passwörter werden verschlüsselt gespeichert. E-Mails werden aktuell noch nicht automatisch abgerufen oder versendet.
+## CRM bereits umgesetzt
 
-### Fertig
+- Firmen, Kontakte und Leads mit eigenem CRM-Bereich
+- Vertriebsrolle und `CRM_MANAGE`-Berechtigung
+- Quellen-URL, Opt-out-Feld, Lead-Status, Score und nächste Aktion
+- CRM-Schnellzugriff im Dashboard
 
-- Technische Architektur dokumentiert
-- FastAPI-Anwendung gestartet
-- SQLite-Datenbank angebunden
-- Benutzer, Rollen und Berechtigungen angelegt
-- Administrator-Ersteinrichtung über Umgebungsvariablen vorbereitet
-- Zusätzlicher CLI-Befehl zum Anlegen eines Administrators vorhanden
-- Login und Session-Cookie umgesetzt
-- Responsives Dashboard umgesetzt
-- Geschütztes Admin-Dashboard mit Benutzer-, Rollen- und Audit-Übersicht umgesetzt
-- Audit-Log-Grundlage umgesetzt
-- Human-in-the-Loop-Versandprüfung umgesetzt
-- Tests und Runtime-Smoke-Test erfolgreich ausgeführt
+## Als Nächstes
 
-### Noch offen
+1. Recherche öffentlicher geschäftlicher Kontaktdaten mit Quellen-URL und Abrufdatum
+2. Duplikatprüfung und vollständige Opt-out-/Sperrliste
+3. Individuelle Verkaufstexte für AboroSoft auf Basis der Firmeninformationen
+4. Vertriebs-Dashboard mit Aktivitäten und Entwürfen
+6. Anhänge und vollständige E-Mail-Threads
+7. Hintergrund-Synchronisation mit Retry und Fehlerstatus
+8. Tokenverbrauch und Bedrock-Kostenschätzung pro Nachricht/Benutzer/Monat
+9. CSRF-Schutz, Rate-Limits und Produktions-Secret-Management
+10. PostgreSQL, Backups und Deployment-Härtung
 
-- Gmail-OAuth-Anmeldebutton und Callback
-- IMAP/SMTP und mehrere E-Mail-Konten vollständig synchronisieren
-- KI-Provider und AWS-Bedrock-Anbindung
+## Testrecherche ML Consulting
 
-## Phase 2 begonnen: Multi-Account-Grundlage
+- Die Firma wurde mit oeffentlichen Firmendaten angereichert.
+- Der allgemeine Geschaeftskontakt `info@mlgruppe.de` wurde mit Impressum-Quelle gespeichert.
+- Ein individueller AboroSoft-Verkaufsentwurf wurde als Lead-Draft gespeichert und im CRM sichtbar gemacht.
+- Es wurde keine E-Mail automatisch versendet.
 
-- IMAP/SMTP-Konto-Datenmodell hinzugefügt
-- E-Mail-Passwörter werden verschlüsselt gespeichert
-- Admin-Formular zum Anlegen eines Kontos hinzugefügt
-- Sichere IMAP-/SMTP-Verbindungstests als getrennte Funktionen vorbereitet
-- Admin-Schaltfläche zum Testen von IMAP und SMTP umgesetzt
-- Öffentliche Registrierung bleibt deaktiviert
-- Admin kann Benutzer anlegen und einem E-Mail-Konto zuordnen
-- Öffentliche Benutzer-Selbstregistrierung ist nicht vorhanden
-- Google-OAuth-JSON-Upload vorbereitet; Originaldatei wird nicht gespeichert
-- Google-OAuth-Start und Callback ergänzt
-- Gmail-Posteingang, Nachricht öffnen, gelesen markieren und Papierkorb ergänzt
-- Echter Posteingang und Synchronisationsjob folgen als nächster Teil von Phase 2
+## Vertriebsregeln
 
-## Noch zu erledigen – in sinnvoller Reihenfolge
+## LMS-Vertriebsansatz
 
-### Als Nächstes
+- Bildungsunternehmen werden im Vertrieb standardmäßig mit dem LMS-Ansatz angesprochen.
+- ABoroOffice wird in solchen Entwürfen nicht als fertiges Produkt beworben.
+- Die KI soll Discovery-Fragen formulieren und unfertige Funktionen nicht als produktionsreif darstellen.
+- Die ML-Consulting-Testrecherche wurde um E-Learning, Blended Learning, Bildungsmanagement und öffentliche Funktionskontakte vertieft.
+- Neue Firmen starten bei angegebener Website automatisch eine öffentliche KI-Recherche im Hintergrund.
+- Recherche-Status (`pending`, `running`, `completed`, `failed`) und Fehlertext werden im CRM angezeigt.
 
-1. Gmail-Antworten und neue Nachrichten mit Benutzerfreigabe ergänzen
-2. Verständliche Fehlermeldungen bei falschem Server, Port oder Passwort verbessern
-3. IMAP-Postfach abrufen
-4. E-Mails in `EmailMessage` speichern
-5. Posteingang im normalen Dashboard erweitern
-6. Anhänge anzeigen
+## CRM-Erweiterung
 
-### Danach
+- Duplikate werden bei Firmen nach Name/Domain und bei Kontakten nach E-Mail erkannt.
+- Opt-out-Kontakte werden beim erneuten Anlegen und bei Lead-Zuordnung blockiert.
+- Firmen und Kontakte erhalten bei Quellenangabe ein Recherche-Datum.
+- Aktivitäten wie Notizen, Anrufe, Termine und E-Mails können dokumentiert werden.
 
-7. SMTP-Versand für manuell geschriebene E-Mails
-8. Versandvorschau mit Empfänger, Betreff, Inhalt und Anhängen
-9. Harte Freigabeprüfung vor jedem Versand
-10. Antworten und Weiterleiten
-11. Anhänge speichern und anzeigen
-12. Hintergrundjob für regelmäßige Synchronisation
-
-### Spätere Phasen
-
-13. Gmail-OAuth und Microsoft-OAuth
-14. AWS-Bedrock- und OpenAI-Provider
-15. CSV-/TXT-Import für Zugangsdaten
-16. KI-Zusammenfassungen und Antwortentwürfe
-17. Spam- und Phishing-Schutz
-18. Termine, Support, Übersetzung, Leads und Marketing
-19. PostgreSQL, Redis, Docker und Produktionshärtung
-
-## Technischer Prüfstand
-
-- Unit-Tests: 4 bestanden
-- Runtime-Smoke-Test: bestanden
-- Admin-Dashboard-Smoke-Test: bestanden
-- Phase-2-Admin-Formular-Smoke-Test: bestanden
-- Verbindungstest-UI-Smoke-Test: bestanden
-- Benutzerverwaltungs-UI-Smoke-Test: bestanden
-- Gmail-JSON-Upload-Smoke-Test: bestanden
-- Gmail-Posteingang-UI-Smoke-Test: bestanden
-- Virtuelle `.venv` mit allen Gmail-Abhängigkeiten geprüft
-- ASGI-Importtest mit `.venv` erfolgreich
-- Google-Redirect-URI als eindeutige Einstellung gegen `redirect_uri_mismatch` abgesichert
-- OAuth-Callback robuster gegen abgelaufene oder doppelt verwendete Codes gemacht
-- Token-Austausch auf vollständige Callback-URL umgestellt und sichere Google-Fehlerinformation ergänzt
-- Lokalen OAuth-Testtransport für `localhost`/`127.0.0.1` aktiviert
-- PKCE-Code-Verifier für Google-OAuth ergänzt
-- Fehlende Browser-Anmeldung leitet jetzt automatisch zur Login-Seite weiter
-- Anleitung für Google-Fehler `403 access_denied` und Testnutzer ergänzt
-- Python-Kompilierung: erfolgreich
-- CSV-/TXT-Import für Zugangsdaten
-- Spam, Phishing, Kalender und Support
-- Leads, Marketing und Kampagnen
-
-## Administrator anlegen
-
-### Variante A: automatisch beim ersten Start
-
-In `.env` werden `ADMIN_EMAIL` und `ADMIN_PASSWORD` gesetzt. Beim Start legt die Anwendung dieses Konto automatisch an, falls es noch nicht existiert.
-
-### Variante B: interaktiver Befehl
-
-```powershell
-py -3 -m app.cli create-admin
-```
-
-Der Befehl fragt E-Mail-Adresse, Anzeigenamen und Passwort sicher ab. Er legt die Datenbanktabellen und die Administratorrolle bei Bedarf selbst an.
+- Recherche und Textgenerierung erzeugen nur Entwürfe.
+- Kein automatischer Massenversand.
+- Vor dem Versand stehen Empfänger, Quelle, Rechtsgrundlage/Einwilligungsstatus und Opt-out-Status sichtbar im Datensatz.
+- E-Mail-Versand bleibt eine manuelle Benutzeraktion.

@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     admin_password: str = "change-me-now"
     session_cookie_secure: bool = False
     bedrock_region: str = "eu-central-1"
-    # Diese Adresse muss exakt in Google Cloud als Redirect URI eingetragen sein.
-    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    bedrock_model_id: str = "eu.anthropic.claude-sonnet-4-6"
+    bedrock_api_key_file: str = "bedrock-long-term-api-key.csv"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

@@ -31,16 +31,6 @@ py -3 -m app.cli create-admin
 
 Der Fortschritt wird in [STATUS.md](STATUS.md) fortgeschrieben.
 
-Für Gmail muss `GOOGLE_REDIRECT_URI` exakt mit der in Google Cloud eingetragenen Weiterleitungsadresse übereinstimmen. Standardmäßig ist das lokal:
-
-```text
-http://localhost:8000/auth/google/callback
-```
-
-Wenn Google `403 access_denied` meldet, muss die Gmail-Adresse im OAuth-Zustimmungsbildschirm als Testnutzer eingetragen werden. Siehe [Gmail-OAuth-Fehlerhilfe](docs/google-oauth-troubleshooting.md).
-
-Der lokale Test verwendet `http://localhost`. Dafür wird HTTPS nur während des lokalen OAuth-Tests ausdrücklich erlaubt. Für einen späteren Betrieb im Internet muss die Anwendung mit HTTPS betrieben werden; die lokale Ausnahme gilt dann nicht.
-
 ## Tests
 
 ```powershell

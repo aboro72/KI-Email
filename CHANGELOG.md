@@ -1,41 +1,45 @@
 # Änderungsverlauf
 
-## 24.09.2026 – Phase-2-Grundlage
+## 29.09.2026 – Multi-Account, KI-Posteingang und Antworten
 
-- Multi-Account-Datenmodell ergänzt
-- IMAP-/SMTP-Felder ergänzt
-- E-Mail-Passwörter verschlüsselt gespeichert
-- Admin-Formular für E-Mail-Konten ergänzt
-- Admin-Dashboard um E-Mail-Konten erweitert
-- IMAP-/SMTP-Verbindungstest als sichere Serverfunktion vorbereitet
-- Verbindungstest-Schaltfläche im Admin-Dashboard ergänzt
-- IMAP-/SMTP-Verbindungstest gegen verschlüsselte Kontodaten ergänzt
-- Verbindungstest prüft Zugangsdaten, verschickt aber keine Nachricht
-- Öffentliche Selbstregistrierung ausdrücklich nicht vorgesehen
-- Admin-Benutzerverwaltung mit Zuordnung zu einem E-Mail-Konto ergänzt
-- Benutzer-Selbstregistrierung ausgeschlossen; Benutzeranlage nur durch Admin
-- Gmail-OAuth-JSON-Upload im Admin-Dashboard ergänzt
-- OAuth-JSON wird validiert und verschlüsselt gespeichert
-- Gmail-OAuth-Start und Callback ergänzt
-- Gmail-Posteingang mit Öffnen, gelesen markieren und Papierkorb ergänzt
-- Status und offene Aufgaben dokumentiert
+- Benutzer können mehreren E-Mail-Konten zugeordnet werden.
+- Ein E-Mail-Konto kann mehreren Benutzern zugeordnet werden.
+- Postfachzugriff auf zugeordnete Konten begrenzt.
+- Admin kann Benutzer bearbeiten, Passwörter ändern und löschen.
+- Helle Oberfläche und sichtbare Navigation ergänzt.
+- IMAP-Empfang und KI-Analyse über Bedrock ergänzt.
+- Claude Sonnet 4.6 als Bedrock-Modell ausgewählt und getestet.
+- Kategorien, Prioritäten, Zusammenfassungen und Antwortentwürfe ergänzt.
+- Antworten können bearbeitet, gespeichert und manuell per SMTP versendet werden.
+- Versand- und Benutzeraktionen werden protokolliert.
+- Neues E-Mail-Fenster mit An, CC, BCC und Anhängen ergänzt.
+- Antworten und Weiterleitungen auf den gemeinsamen Editor umgestellt.
+- Text- und HTML-Versand mit einfacher WYSIWYG-Formatierung ergänzt.
+- SMTP-Versand unterstützt Text- und HTML-Inhalte sowie Anhänge.
+- KI-Seitenleiste mit direkten Aktionen im Nachrichtenfenster ergänzt.
+- Antwortentwürfe können über die KI gekürzt oder stilistisch angepasst werden.
+- Entwicklungsstand und offene Vertriebsfunktionen in `STATUS.md` dokumentiert.
+- CRM-Grundmodul mit Firmen, Kontakten und Leads ergänzt.
+- Vertriebsrolle und `CRM_MANAGE`-Berechtigung ergänzt.
+- Quellen, Opt-out, Lead-Status, Score und nächste Aktion speicherbar.
 
-## 24.09.2026 – Phase 1
+## Testrecherche ML Consulting
 
-- FastAPI-Grundgerüst erstellt
-- SQLite-Datenbank eingerichtet
-- Login und Administratorrolle erstellt
-- Rollen und Berechtigungen ergänzt
-- Admin-Dashboard erstellt
-- Human-in-the-Loop-Versandprüfung umgesetzt
+- Oeffentliche Firmendaten, Impressum-Quelle und der allgemeine Kontakt `info@mlgruppe.de` gespeichert.
+- Individuellen AboroSoft-Verkaufsentwurf als Lead-Draft gespeichert und in der CRM-Ansicht sichtbar gemacht.
+- Kein automatischer Versand ausgelost.
 
-## 24.09.2026 – Fehlerbehebung
+## Offene Vertriebsfunktionen
 
-- Fehlendes `google-auth-oauthlib` in der verwendeten `.venv` installiert
-- Abhängigkeiten mit `requirements.txt` synchronisiert
-- ASGI-Import und Tests in derselben virtuellen Umgebung geprüft
-- Google-Redirect-URI konfigurierbar gemacht und lokal auf `localhost` vereinheitlicht
-- `InvalidGrantError` verständlich abgefangen; OAuth-Session wird beim Callback erneut gesetzt
-- Lokale OAuth-HTTP-Ausnahme für Entwicklung ergänzt; Produktion bleibt HTTPS-pflichtig
-- Google-PKCE-Verifier über signierten OAuth-State ergänzt
-- Browserfreundliche Weiterleitung von `401 Unauthorized` zur Login-Seite ergänzt
+## CRM-Schutz und Aktivitäten
+
+- Doppelte Firmen und Kontakte werden beim Anlegen erkannt.
+- Opt-out-Kontakte werden für neue Leads gesperrt.
+- Recherche-Datum wird bei Quellenangaben gespeichert.
+- Aktivitäten können als Notiz, Anruf, Termin oder E-Mail dokumentiert werden.
+
+- Firmen, Kontakte und Leads
+- öffentliche Recherche mit Quellenverwaltung
+- Duplikat- und Opt-out-Prüfung
+- individuell angepasste AboroSoft-Verkaufstexte
+- Vertriebs-Dashboard und Kampagnenverwaltung
