@@ -15,16 +15,38 @@ Die Anwendung und Datenbank sollten nicht direkt aus dem öffentlichen ISPConfig
 
 ## Installation
 
-Repository auf den Server übertragen oder klonen und in das Projektverzeichnis wechseln:
+## FTP-Layout
+
+Lade den kompletten Projektordner per FTP so hoch, dass die Struktur auf dem Server wie folgt aussieht:
+
+```text
+/web/app/
+├── app/
+├── requirements.txt
+├── README.md
+└── deploy/
+    └── ispconfig3/
+        ├── install.sh
+        └── installation.md
+```
+
+Wichtig: Nur die beiden Dateien aus `deploy/ispconfig3` reichen nicht aus. Das Skript benötigt den vollständigen Projektstamm `/web/app` mit `app/` und `requirements.txt`.
+
+Der FTP-Upload allein installiert noch nichts. Danach per SSH am Server anmelden und die Installation mit Root- oder sudo-Rechten ausführen:
 
 ```bash
-git clone <REPOSITORY-URL> /opt/aborodesk-source
-cd /opt/aborodesk-source
-chmod +x deploy/ispconfig3/install.sh
-sudo SOURCE_DIR="$PWD" SERVICE_USER=webXXX SERVICE_GROUP=clientY APP_PORT=8001 deploy/ispconfig3/install.sh
+cd /web/app/deploy/ispconfig3
+chmod +x install.sh
+sudo SERVICE_USER=webXXX SERVICE_GROUP=clientY APP_PORT=8001 ./install.sh
 ```
 
 `webXXX` und `clientY` müssen durch den Benutzer und die Gruppe der betreffenden ISPConfig-Website ersetzt werden. Wenn ein separater Systembenutzer verwendet werden soll, muss dieser vorher existieren und Zugriff auf die Installationsverzeichnisse erhalten. Falls Benutzer und Gruppe identisch sind, kann `SERVICE_GROUP` entfallen.
+
+Der Standardquellpfad ist bereits `/web/app`. Bei einem anderen FTP-Ziel kann er ausdrücklich gesetzt werden:
+
+```bash
+sudo SOURCE_DIR=/anderer/pfad SERVICE_USER=webXXX SERVICE_GROUP=clientY ./install.sh
+```
 
 Das Skript:
 
@@ -34,6 +56,8 @@ Das Skript:
 - legt den systemd-Dienst `aborodesk.service` an
 - legt die geschützte Environment-Datei unter `/etc/aborodesk/aborodesk.env` an
 - startet den Dienst auf `127.0.0.1:8001`
+
+Die Anwendung wird absichtlich nach `/opt/aborodesk` kopiert. Dadurch wird der FTP-Webbereich nicht als Python-Anwendung ausgeführt und die Quelldateien liegen nicht direkt im öffentlich ausgelieferten Website-Verzeichnis.
 
 ## Environment-Datei konfigurieren
 

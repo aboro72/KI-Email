@@ -13,7 +13,13 @@ SERVICE_NAME="${SERVICE_NAME:-aborodesk}"
 SERVICE_USER="${SERVICE_USER:-www-data}"
 SERVICE_GROUP="${SERVICE_GROUP:-${SERVICE_USER}}"
 APP_PORT="${APP_PORT:-8001}"
-SOURCE_DIR="${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# FTP-Layout des ISPConfig-Projekts: /web/app enthält app/, requirements.txt usw.
+# SOURCE_DIR kann für ein anderes Layout weiterhin überschrieben werden.
+SOURCE_DIR="${SOURCE_DIR:-/web/app}"
+if [[ ! -d "${SOURCE_DIR}/app" && -d "${SCRIPT_DIR}/../.."/app ]]; then
+  SOURCE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+fi
 
 die() { echo "FEHLER: $*" >&2; exit 1; }
 log() { echo "[AboroDesk] $*"; }
