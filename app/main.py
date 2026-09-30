@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import Base, engine, get_db, initialize_persistence
-from app.models import Activity, AuditLog, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, OutgoingEmail, Permission, Role, Ticket, TicketComment, User, user_email_accounts
+from app.models import Activity, AuditLog, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, OutgoingEmail, Permission, Role, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
 
@@ -37,9 +37,9 @@ ROLE_PERMISSIONS = {
     "EMAIL_SEND": "E-Mails versenden",
     "AI_GENERATE": "KI-Vorschläge erzeugen",
     "CRM_MANAGE": "CRM benutzen",
-    "MARKETING_VIEW": "Marketing-Modul benutzen (vorbereitet)",
-    "MARKETING_MANAGE": "Marketing-Kampagnen verwalten (vorbereitet)",
-    "MARKETING_TEAM_LEAD": "Marketing-Team leiten (vorbereitet)",
+    "MARKETING_VIEW": "Marketing-Modul benutzen",
+    "MARKETING_MANAGE": "Marketing-Kampagnen verwalten",
+    "MARKETING_TEAM_LEAD": "Marketing-Team leiten",
     "SALES_TEAM_LEAD": "Vertriebs-Team leiten (vorbereitet)",
     "HELPDESK_VIEW": "Helpdesk benutzen (vorbereitet)",
     "HELPDESK_MANAGE": "Tickets verwalten",
@@ -255,6 +255,8 @@ def _rate_limit_for(path: str) -> tuple[int, int]:
         return 20, 3600
     if path == "/compose" or path.endswith("/reply") or path.endswith("/send"):
         return 30, 3600
+    if path.startswith("/marketing"):
+        return 30, 3600
     return 120, 300
 
 
@@ -349,7 +351,8 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     sent_count = db.scalar(select(func.count()).select_from(OutgoingEmail).where(OutgoingEmail.created_by_user_id == user.id, OutgoingEmail.status == "sent")) or 0
     can_crm = any(item.name == "CRM_MANAGE" for item in user.role.permissions)
     can_helpdesk = any(item.name == "HELPDESK_VIEW" for item in user.role.permissions)
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk, "update_status": _update_status()})
+    can_marketing = any(item.name == "MARKETING_VIEW" for item in user.role.permissions)
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk, "can_marketing": can_marketing, "update_status": _update_status()})
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -461,6 +464,112 @@ def _import_support_email_as_ticket(account: EmailAccount, item: dict, db: Sessi
     db.add(ticket)
     db.flush()
     db.add(AuditLog(action="HELPDESK_EMAIL_CREATED", actor_user_id=system_user.id, details=f'{{"ticket": "{ticket_number}", "account_id": {account.id}}}'))
+
+
+def _marketing_accounts(user: User, db: Session) -> list[EmailAccount]:
+    if user.role.name == "admin":
+        return db.scalars(select(EmailAccount).where(EmailAccount.is_active).order_by(EmailAccount.email_address)).all()
+    return [account for account in user.email_accounts if account.is_active]
+
+
+def _can_use_marketing_account(user: User, account: EmailAccount) -> bool:
+    return account.is_active and (user.role.name == "admin" or account in user.email_accounts)
+
+
+@app.get("/marketing", response_class=HTMLResponse)
+def marketing_dashboard(request: Request, db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    require_permission(user, "MARKETING_VIEW")
+    campaigns = db.scalars(select(MarketingCampaign).order_by(MarketingCampaign.created_at.desc())).all()
+    return templates.TemplateResponse(request=request, name="marketing.html", context={"user": user, "campaigns": campaigns, "accounts": _marketing_accounts(user, db), "message": request.query_params.get("message")})
+
+
+@app.get("/marketing/campaigns/new", response_class=HTMLResponse)
+def marketing_campaign_new(request: Request, db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    require_permission(user, "MARKETING_MANAGE")
+    contacts = db.scalars(select(Contact).where(Contact.opt_out.is_(False)).order_by(Contact.name)).all()
+    return templates.TemplateResponse(request=request, name="marketing_campaign_form.html", context={"user": user, "accounts": _marketing_accounts(user, db), "contacts": contacts})
+
+
+@app.post("/marketing/campaigns")
+def marketing_campaign_create(request: Request, name: str = Form(...), account_id: int = Form(...), subject: str = Form(...), body: str = Form(...), contact_ids: list[int] = Form(default=[]), db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    require_permission(user, "MARKETING_MANAGE")
+    account = db.get(EmailAccount, account_id)
+    if not account or not _can_use_marketing_account(user, account):
+        return RedirectResponse("/marketing?message=E-Mail-Konto+nicht+verfügbar", status_code=303)
+    if not name.strip() or not subject.strip() or not body.strip():
+        return RedirectResponse("/marketing/campaigns/new?message=Name%2C+Betreff+und+Text+sind+erforderlich", status_code=303)
+    contacts = db.scalars(select(Contact).where(Contact.id.in_(contact_ids), Contact.opt_out.is_(False))).all() if contact_ids else []
+    if not contacts:
+        return RedirectResponse("/marketing/campaigns/new?message=Mindestens+ein+freigegebener+Kontakt+ist+erforderlich", status_code=303)
+    campaign = MarketingCampaign(name=name.strip(), subject=subject.strip(), body=body.strip(), account_id=account.id, status="draft", created_by_user_id=user.id)
+    db.add(campaign)
+    db.flush()
+    seen: set[str] = set()
+    for contact in contacts:
+        email = contact.email.strip().lower()
+        if email and email not in seen:
+            db.add(MarketingRecipient(campaign_id=campaign.id, contact_id=contact.id, name=contact.name, email=email, opt_out_snapshot=contact.opt_out, status="pending"))
+            seen.add(email)
+    db.add(AuditLog(action="MARKETING_CAMPAIGN_CREATED", actor_user_id=user.id, details=f'{{"campaign_id": {campaign.id}, "recipients": {len(seen)}}}'))
+    db.commit()
+    return RedirectResponse(f"/marketing/campaigns/{campaign.id}", status_code=303)
+
+
+@app.get("/marketing/campaigns/{campaign_id}", response_class=HTMLResponse)
+def marketing_campaign_detail(campaign_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    require_permission(user, "MARKETING_VIEW")
+    campaign = db.get(MarketingCampaign, campaign_id)
+    if not campaign:
+        return RedirectResponse("/marketing?message=Kampagne+nicht+gefunden", status_code=303)
+    account = db.get(EmailAccount, campaign.account_id)
+    recipients = db.scalars(select(MarketingRecipient).where(MarketingRecipient.campaign_id == campaign.id).order_by(MarketingRecipient.name)).all()
+    return templates.TemplateResponse(request=request, name="marketing_campaign_detail.html", context={"user": user, "campaign": campaign, "account": account, "recipients": recipients, "message": request.query_params.get("message")})
+
+
+@app.post("/marketing/campaigns/{campaign_id}/send")
+def marketing_campaign_send(campaign_id: int, request: Request, confirm: str = Form(""), db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    require_permission(user, "MARKETING_MANAGE")
+    campaign = db.get(MarketingCampaign, campaign_id)
+    account = db.get(EmailAccount, campaign.account_id) if campaign else None
+    if not campaign or not account or not _can_use_marketing_account(user, account):
+        return RedirectResponse("/marketing?message=Kampagne+nicht+verfügbar", status_code=303)
+    if confirm != "send":
+        return RedirectResponse(f"/marketing/campaigns/{campaign.id}?message=Versand+nicht+bestätigt", status_code=303)
+    eligible = db.scalars(select(MarketingRecipient).where(MarketingRecipient.campaign_id == campaign.id, MarketingRecipient.status == "pending", MarketingRecipient.opt_out_snapshot.is_(False))).all()
+    if not eligible:
+        return RedirectResponse(f"/marketing/campaigns/{campaign.id}?message=Keine+versendbaren+Empfänger", status_code=303)
+    from app.mail import send_email
+    campaign.status = "sending"
+    db.commit()
+    password = decrypt_secret(account.encrypted_password)
+    for recipient in eligible:
+        contact = db.get(Contact, recipient.contact_id) if recipient.contact_id else None
+        if contact and contact.opt_out:
+            recipient.opt_out_snapshot = True
+            recipient.status = "skipped"
+            recipient.error = "Opt-out liegt inzwischen vor"
+            db.commit()
+            continue
+        try:
+            send_email(account.smtp_host, account.smtp_port, account.username, password, account.email_address, recipient.email, campaign.subject, campaign.body, None)
+            recipient.status = "sent"
+            recipient.sent_at = datetime.now(timezone.utc)
+            recipient.error = ""
+        except Exception as exc:
+            recipient.status = "failed"
+            recipient.error = type(exc).__name__
+        db.commit()
+    failed = db.scalar(select(func.count()).select_from(MarketingRecipient).where(MarketingRecipient.campaign_id == campaign.id, MarketingRecipient.status == "failed")) or 0
+    campaign.status = "partial" if failed else "sent"
+    campaign.sent_at = datetime.now(timezone.utc)
+    db.add(AuditLog(action="MARKETING_CAMPAIGN_SENT", actor_user_id=user.id, details=f'{{"campaign_id": {campaign.id}, "failed": {failed}}}'))
+    db.commit()
+    return RedirectResponse(f"/marketing/campaigns/{campaign.id}?message=Versand+abgeschlossen", status_code=303)
 
 
 @app.get("/crm", response_class=HTMLResponse)

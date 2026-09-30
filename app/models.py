@@ -208,6 +208,35 @@ class Activity(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class MarketingCampaign(Base):
+    __tablename__ = "marketing_campaigns"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(240), index=True)
+    subject: Mapped[str] = mapped_column(String(998))
+    body: Mapped[str] = mapped_column(Text)
+    account_id: Mapped[int] = mapped_column(ForeignKey("email_accounts.id"), index=True)
+    status: Mapped[str] = mapped_column(String(30), default="draft", index=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    recipients: Mapped[list["MarketingRecipient"]] = relationship(back_populates="campaign", cascade="all, delete-orphan")
+
+
+class MarketingRecipient(Base):
+    __tablename__ = "marketing_recipients"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("marketing_campaigns.id"), index=True)
+    contact_id: Mapped[int | None] = mapped_column(ForeignKey("contacts.id"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), default="")
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    opt_out_snapshot: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    error: Mapped[str] = mapped_column(Text, default="")
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    campaign: Mapped[MarketingCampaign] = relationship(back_populates="recipients")
+
+
 class HelpdeskCategory(Base):
     __tablename__ = "helpdesk_categories"
     id: Mapped[int] = mapped_column(primary_key=True)
