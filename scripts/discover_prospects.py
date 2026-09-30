@@ -1,0 +1,106 @@
+"""Findet öffentlich auffindbare Firmen und reiht sie zur CRM-KI-Recherche ein."""
+
+from __future__ import annotations
+
+import os
+import re
+import sys
+from html.parser import HTMLParser
+from urllib.parse import parse_qs, quote_plus, urlparse
+from urllib.request import Request, urlopen
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from sqlalchemy import select
+
+from app.db import Base, SessionLocal, engine, initialize_persistence
+from app.jobs import enqueue
+from app.models import Company
+
+DEFAULT_QUERIES = {
+    "aborodesk": ["KMU Kundenservice CRM Automatisierung Deutschland", "Dienstleister Kundenkommunikation Support Team Deutschland"],
+    "aborolms": ["Weiterbildungsanbieter Online Kurse Prüfungen Zertifikate Deutschland", "Akademie E-Learning Schulungen Unternehmen Deutschland"],
+    "cloudshare": ["Unternehmen sicherer Dokumentenaustausch Kunden Partner Deutschland", "Ingenieurbüro Kundenportal Dateifreigabe Deutschland"],
+    "helpdesk": ["IT Dienstleister Ticketsystem SLA Support Deutschland", "Softwarehaus Kundensupport Helpdesk Serviceverträge Deutschland"],
+}
+BLOCKED_HOSTS = {"google.com", "bing.com", "duckduckgo.com", "facebook.com", "instagram.com", "linkedin.com", "youtube.com", "wikipedia.org"}
+
+
+class LinkParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == "a":
+            href = dict(attrs).get("href", "")
+            if href:
+                self.links.append(href)
+
+
+def search(query: str, limit: int) -> list[str]:
+    url = "https://html.duckduckgo.com/html/?q=" + quote_plus(query)
+    request = Request(url, headers={"User-Agent": "AboroDesk-ProspectResearch/1.0"})
+    with urlopen(request, timeout=20) as response:
+        html = response.read(1_500_000).decode("utf-8", errors="ignore")
+    parser = LinkParser()
+    parser.feed(html)
+    results = []
+    for href in parser.links:
+        target = parse_qs(urlparse("https:" + href).query).get("uddg", [""])[0] if href.startswith("//duckduckgo.com/l/?") else href
+        parsed = urlparse(target)
+        host = (parsed.hostname or "").lower().removeprefix("www.")
+        if parsed.scheme not in {"http", "https"} or not host or any(host == blocked or host.endswith("." + blocked) for blocked in BLOCKED_HOSTS):
+            continue
+        normalized = f"https://{host}/"
+        if normalized not in results:
+            results.append(normalized)
+        if len(results) >= limit:
+            break
+    return results
+
+
+def domain_name(url: str) -> tuple[str, str]:
+    host = (urlparse(url).hostname or "").removeprefix("www.")
+    name = re.sub(r"[-_.]+", " ", host.split(".")[0]).strip().title() or host
+    return name[:240], host[:255]
+
+
+def main() -> int:
+    Base.metadata.create_all(engine)
+    initialize_persistence()
+    max_per_query = max(1, int(os.getenv("PROSPECTS_PER_QUERY", "5")))
+    dry_run = os.getenv("PROSPECT_DISCOVERY_DRY_RUN", "0") == "1"
+    all_urls: list[str] = []
+    for product, queries in DEFAULT_QUERIES.items():
+        for query in queries:
+            try:
+                urls = search(query, max_per_query)
+                print(f"{product}: {query} -> {len(urls)} Treffer")
+                all_urls.extend(urls)
+            except Exception as exc:
+                print(f"WARNUNG Suche fehlgeschlagen ({product}): {type(exc).__name__}", file=sys.stderr)
+    with SessionLocal() as db:
+        known_domains = {item.lower() for item in db.scalars(select(Company.domain)).all() if item}
+        seen = set()
+        created = 0
+        for url in all_urls:
+            name, domain = domain_name(url)
+            if domain in seen or domain in known_domains or domain == "aborosoft.com":
+                continue
+            seen.add(domain)
+            if dry_run:
+                print(f"DRY-RUN {name} {url}")
+                continue
+            company = Company(name=name, domain=domain, website=url, source_url="DuckDuckGo-Websuche", research_status="pending", notes="Automatisch als Recherche-Kandidat gefunden; vor Kontaktaufnahme prüfen.")
+            db.add(company)
+            db.flush()
+            enqueue(db, "crm.company_research", {"company_id": company.id})
+            known_domains.add(domain)
+            created += 1
+        print(f"Neue CRM-Kandidaten: {created}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
