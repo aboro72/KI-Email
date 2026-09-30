@@ -182,6 +182,17 @@ Während der ungeklärten Persistenzprobleme keine zusätzlichen schreibenden Di
 - `docs/fortschritt-und-roadmap.md`: ältere Roadmap; teils überholte Offen-Punkte.
 - `docs/architecture.md`: ursprünglicher Entwurf, kein verlässlicher aktueller Betriebsstand.
 
+## Nachtrag: Stand vom Abend des 30.09.2026
+
+- Ein aktuelles MongoDB-Backup wurde erfolgreich erstellt und als komprimierbares Archiv geprüft: `/var/backups/aborodesk/mongodb/20260930T182837Z/aborodesk.archive.gz`.
+- Die Worker-/Jobdiagnose bestätigte das bekannte Persistenzproblem: Web-App und Worker laden MongoDB beim Start in voneinander getrennte SQLite-In-Memory-Kopien. Neue Jobs werden von einem bereits laufenden Worker deshalb nicht zuverlässig gesehen; Neustarts machen den aktuellen Stand sichtbar, beheben die Architekturursache aber nicht.
+- Die lokale Initialisierung erzeugt vor dem Mongo-Import nun die SQLite-Arbeitstabellen. Dadurch scheitern eigenständige Prozesse nicht mehr mit `no such table: ticket_comments`.
+- Die lokale Joblogik beansprucht Jobs atomar und behandelt verwaiste `running`-Jobs nach Worker-Neustart kontrolliert. Diese Änderungen sind lokal getestet, müssen aber erst als zusammenhängende Persistenzlösung sicher auf den Server überführt werden.
+- Die Firmenrecherche für 3Dplaner wurde mehrfach ausgeführt. Der aktuelle Blocker ist Bedrock: zunächst Quarantäne des IAM-Benutzers `BedrockAPIKey-8r9w`, danach Ablehnung des hinterlegten neuen API-Keys als ungültig. Keine weiteren Wiederholungen starten, bis ein erfolgreicher einzelner Bedrock-Test möglich ist.
+- `app/bedrock.py` bevorzugt jetzt die konfigurierte CSV-Schlüsseldatei vor `AWS_BEARER_TOKEN_BEDROCK`; die Umgebungsvariable ist nur noch Fallback. Diese Änderung wurde auf den Server übertragen und beide Dienste wurden neu gestartet.
+- Die neue Schlüsseldatei wurde serverseitig unter `/etc/aborodesk/bedrock-long-term-api-key.csv` mit `root:client2` und `0640` hinterlegt. Schlüsselwerte gehören weiterhin nicht in Git oder diese Übergabe.
+- Die Überwachung `3dplaner-recherche-berwachen` ist aktiv und soll nur bei Statuswechsel, Fehler oder notwendigem Eingriff informieren.
+
 ## Startauftrag für die nächste Sitzung
 
 > Lies docs/UEBERGABE-2026-09-30.md vollständig. Arbeite an AboroDesk als modularer Einzelkundenlösung weiter. Sichere zuerst den aktuellen Produktionsstand, behebe die prozessübergreifende MongoDB-Persistenz und prüfe den Worker mit einer einzelnen Firma. Danach repariere und teste die Firmenlöschung einschließlich Kampagnenreferenzen, aktiver Recherche und Domain-Ausschluss. Gleiche GitHub und Serverdateien ab. Melde nur Funktionen als fertig, deren tatsächlicher Ablauf geprüft wurde.
