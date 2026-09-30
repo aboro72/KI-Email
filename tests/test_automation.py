@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.automation import emit_event, register_action
 from app.db import Base
+from app.jobs import enqueue, register_handler, run_pending
 from app.models import AutomationRule
 
 
@@ -37,3 +38,15 @@ def test_automation_rule_ignores_non_matching_event(db_session):
     db_session.add(AutomationRule(name="Nur hoch", module="tests", event_name="email.received", conditions_json='{"priority":"hoch"}', actions_json='[]'))
     db_session.commit()
     assert emit_event(db_session, "email.received", {"priority": "normal"}) == []
+
+
+def test_background_job_is_retried_and_then_completed(db_session):
+    calls = []
+    register_handler("tests.job", lambda db, payload: calls.append(payload))
+    job = enqueue(db_session, "tests.job", {"message_id": 4}, max_attempts=2)
+
+    processed = run_pending(db_session)
+
+    assert processed[0].id == job.id
+    assert processed[0].status == "completed"
+    assert calls == [{"message_id": 4}]

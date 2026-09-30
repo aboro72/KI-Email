@@ -1,0 +1,53 @@
+"""Datenbankbasierte Job-Warteschlange für den Einzelserver und kleine Installationen."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Callable, Mapping
+from datetime import datetime, timezone
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import BackgroundJob
+
+Handler = Callable[[Session, Mapping[str, object]], None]
+_HANDLERS: dict[str, Handler] = {}
+
+
+def register_handler(job_type: str, handler: Handler) -> None:
+    if not job_type or not callable(handler):
+        raise ValueError("Ein Job-Handler benötigt einen Typ und eine aufrufbare Funktion.")
+    _HANDLERS[job_type] = handler
+
+
+def enqueue(db: Session, job_type: str, payload: Mapping[str, object], *, max_attempts: int = 3) -> BackgroundJob:
+    job = BackgroundJob(job_type=job_type, payload_json=json.dumps(dict(payload), default=str), max_attempts=max(1, max_attempts))
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def run_pending(db: Session, *, limit: int = 10) -> list[BackgroundJob]:
+    """Verarbeitet eine begrenzte Anzahl Jobs; ein Worker kann diese Funktion zyklisch aufrufen."""
+    now = datetime.now(timezone.utc)
+    jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.status == "queued", BackgroundJob.available_at <= now).order_by(BackgroundJob.created_at).limit(limit)).all()
+    for job in jobs:
+        job.status = "running"
+        job.locked_at = now
+        job.attempts += 1
+        db.commit()
+        try:
+            handler = _HANDLERS.get(job.job_type)
+            if handler is None:
+                raise ValueError(f"Unbekannter Job-Typ: {job.job_type}")
+            handler(db, json.loads(job.payload_json or "{}"))
+            job.status = "completed"
+            job.finished_at = datetime.now(timezone.utc)
+            job.error = ""
+        except Exception as exc:
+            job.error = str(exc)[:1000]
+            job.status = "failed" if job.attempts >= job.max_attempts else "queued"
+        db.commit()
+    return jobs

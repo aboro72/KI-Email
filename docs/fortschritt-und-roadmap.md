@@ -24,9 +24,9 @@ Dieses Dokument ist die Arbeitsgrundlage für die weitere Entwicklung. Die Anwen
 
 Vorhanden sind jetzt ein gemeinsames Ereignismodell, einfache Bedingungen, registrierbare Modul-Aktionen und ein Audit-fähiger Laufstatus. Als Nächstes müssen CRM-, Helpdesk- und E-Mail-Ereignisse angeschlossen werden. Automatische Aktionen mit Außenwirkung bleiben zunächst freigabepflichtig.
 
-### 2. Hintergrundaufgaben
+### 2. Hintergrundaufgaben – begonnen
 
-Noch offen: langlebige Worker für E-Mail-Synchronisierung, KI-Recherche, Kampagnenvorbereitung, Erinnerungen und Updates. Für den Einzelserver sollte zunächst eine einfache Datenbank-/Systemd-Queue möglich sein; Redis/RQ oder Celery bleiben optionale Skalierungsvarianten.
+Eine dauerhafte Datenbank-Warteschlange mit Wiederholungsversuchen, Fehlerstatus und registrierbaren Modul-Handlern ist jetzt vorhanden. Noch offen: ein produktiver systemd-Worker, der die Queue regelmäßig abarbeitet, sowie die Anbindung der konkreten E-Mail-, KI- und Erinnerungsaufgaben. Für mehrere Server bleiben Redis/RQ oder Celery optionale Skalierungsvarianten.
 
 ### 3. Aufgaben, Erinnerungen und Benachrichtigungen
 
