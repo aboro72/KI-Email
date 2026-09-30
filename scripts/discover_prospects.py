@@ -24,7 +24,7 @@ DEFAULT_QUERIES = {
     "cloudshare": ["Unternehmen sicherer Dokumentenaustausch Kunden Partner Deutschland", "Ingenieurbüro Kundenportal Dateifreigabe Deutschland"],
     "helpdesk": ["IT Dienstleister Ticketsystem SLA Support Deutschland", "Softwarehaus Kundensupport Helpdesk Serviceverträge Deutschland"],
 }
-BLOCKED_HOSTS = {"google.com", "bing.com", "duckduckgo.com", "facebook.com", "instagram.com", "linkedin.com", "youtube.com", "wikipedia.org"}
+BLOCKED_HOSTS = {"google.com", "google.de", "googleusercontent.com", "bing.com", "duckduckgo.com", "facebook.com", "instagram.com", "linkedin.com", "youtube.com", "wikipedia.org", "destatis.de", "unternehmensregister.de"}
 
 
 class LinkParser(HTMLParser):

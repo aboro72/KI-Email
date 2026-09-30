@@ -6,6 +6,7 @@ SERVICE_NAME="${SERVICE_NAME:-aborodesk}"
 SERVICE_USER="${SERVICE_USER:-web29}"
 SERVICE_GROUP="${SERVICE_GROUP:-client2}"
 INTERVAL="${INTERVAL:-12h}"
+PROSPECTS_PER_QUERY="${PROSPECTS_PER_QUERY:-2}"
 [[ "${EUID}" -eq 0 ]] || { echo "Bitte als root ausführen." >&2; exit 1; }
 cat > "/etc/systemd/system/${SERVICE_NAME}-prospect-discovery.service" <<EOF
 [Unit]
@@ -19,7 +20,7 @@ User=${SERVICE_USER}
 Group=${SERVICE_GROUP}
 WorkingDirectory=${APP_DIR}
 EnvironmentFile=/etc/aborodesk/${SERVICE_NAME}.env
-Environment=PROSPECTS_PER_QUERY=5
+Environment=PROSPECTS_PER_QUERY=${PROSPECTS_PER_QUERY}
 ExecStart=${APP_DIR}/.venv/bin/python ${APP_DIR}/scripts/discover_prospects.py
 EOF
 cat > "/etc/systemd/system/${SERVICE_NAME}-prospect-discovery.timer" <<EOF
