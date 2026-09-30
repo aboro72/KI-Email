@@ -40,3 +40,29 @@ Prioritäten:
 7. Vor jeder Kontaktaufnahme menschliche Prüfung verlangen
 
 ABoroOffice wird in dieser Recherche nicht als Zielprodukt verwendet.
+
+## Automatische Kandidatensuche
+
+Der Server führt zusätzlich automatisch eine öffentliche Websuche für alle vier Produkte aus. Pro Suchlauf werden passende neue Domains als CRM-Firmen mit `research_status=pending` angelegt und an den Hintergrund-Worker übergeben. Der Worker ruft die öffentliche Website ab, erstellt die KI-Zusammenfassung und berechnet anschließend den Produkt-Fit für AboroDesk, ABoroLMS, CloudShare und HelpDesk.
+
+Der Suchlauf ist als `aborodesk-prospect-discovery.timer` eingerichtet:
+
+- Start 15 Minuten nach dem Serverstart
+- danach standardmäßig alle 12 Stunden
+- maximal zwei Treffer je Suchanfrage, damit das CRM nicht unkontrolliert wächst
+- Dubletten werden über Domain und vorhandene CRM-Firmen vermieden
+- kein automatischer E-Mail-Versand; jeder Kandidat bleibt vor Kontaktaufnahme prüfpflichtig
+
+Manueller Testlauf auf dem Server:
+
+```bash
+sudo systemctl start aborodesk-prospect-discovery.service
+sudo journalctl -u aborodesk-prospect-discovery.service -n 100 --no-pager
+```
+
+Status prüfen:
+
+```bash
+sudo systemctl status aborodesk-prospect-discovery.timer
+sudo systemctl list-timers aborodesk-prospect-discovery.timer
+```
