@@ -1,5 +1,9 @@
 # KI-Email
 
+## Entwicklungsstatus und Roadmap
+
+Der laufende Umsetzungsstand, die Reihenfolge der nächsten Ausbaustufen und optionale Erweiterungen stehen in [docs/fortschritt-und-roadmap.md](docs/fortschritt-und-roadmap.md).
+
 Modularer, KI-gestützter Multi-Account-E-Mail-Arbeitsplatz. Phase 1 liefert ein ausführbares FastAPI-Grundgerüst mit Benutzerverwaltung, Rollen/Rechten, sicherem Secret-Speicher, Dashboard und technisch erzwungener Human-in-the-Loop-Versandfreigabe.
 
 ## Start

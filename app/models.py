@@ -61,6 +61,36 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class AutomationRule(Base):
+    """Modulare, deaktivierbare Regel für spätere Ereignis-Automationen."""
+    __tablename__ = "automation_rules"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), index=True)
+    module: Mapped[str] = mapped_column(String(80), index=True)
+    event_name: Mapped[str] = mapped_column(String(120), index=True)
+    conditions_json: Mapped[str] = mapped_column(Text, default="{}")
+    actions_json: Mapped[str] = mapped_column(Text, default="[]")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    approval_required: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class AutomationRun(Base):
+    """Nachvollziehbarer Lauf einer Regel – wichtig für Wiederholung und Audit."""
+    __tablename__ = "automation_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    rule_id: Mapped[int | None] = mapped_column(ForeignKey("automation_rules.id"), nullable=True, index=True)
+    event_name: Mapped[str] = mapped_column(String(120), index=True)
+    event_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(30), default="queued", index=True)
+    result_json: Mapped[str] = mapped_column(Text, default="{}")
+    error: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Draft(Base):
     __tablename__ = "drafts"
     id: Mapped[int] = mapped_column(primary_key=True)
