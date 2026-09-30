@@ -46,6 +46,8 @@ Die Installations-Vorprüfung ist als `deploy/preflight.sh` vorhanden und kontro
 
 Der tägliche Backup-Timer ist als `deploy/install-backup-timer.sh` vorhanden. Ein echter Restore-Test bleibt eine Serveraufgabe und muss auf dem Linux-Zielsystem mit einem Testbestand durchgeführt werden.
 
+Serverstatus am 30.09.2026: Worker und Backup-Timer sind aktiv, ein Backup wurde erfolgreich erstellt und in einer separaten Testdatenbank mit 14 Collections und 106 Dokumenten wiederhergestellt. Die Testdatenbank wurde anschließend entfernt.
+
 ## Betrieb: Worker und Backups
 
 Nach der normalen Installation einmalig ausführen:

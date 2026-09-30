@@ -9,6 +9,8 @@ APP_DIR="${APP_DIR:-/opt/aborodesk}"
 SOURCE_DIR="${SOURCE_DIR:-/var/lib/aborodesk-updater/source}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/aborodesk}"
 SERVICE_NAME="${SERVICE_NAME:-aborodesk}"
+SERVICE_USER="${SERVICE_USER:-}"
+SERVICE_GROUP="${SERVICE_GROUP:-${SERVICE_USER}}"
 GIT_BRANCH="${GIT_BRANCH:-master}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8001/health}"
 LOCK_FILE="${LOCK_FILE:-/run/lock/aborodesk-update.lock}"
@@ -68,6 +70,13 @@ rsync -a --exclude '.venv/' --exclude '.deployed-commit' "${APP_DIR}/" "${backup
 log "Installiere neuen Quellstand …"
 rsync -a --delete --exclude '.venv/' --exclude '.env' --exclude '*.db' --exclude 'bedrock-long-term-api-key.csv' --exclude '.deployed-commit' "${SOURCE_DIR}/" "${APP_DIR}/"
 
+# rsync läuft als root und kann dadurch Eigentümer aus dem Update-Checkout
+# übernehmen. Der Dienst muss den Projektordner aber lesen und betreten können.
+if [[ -n "${SERVICE_USER}" ]]; then
+  chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${APP_DIR}"
+  chmod 0755 "${APP_DIR}"
+fi
+
 if [[ -x "${APP_DIR}/.venv/bin/pip" ]]; then
   "${APP_DIR}/.venv/bin/pip" install --quiet -r "${APP_DIR}/requirements.txt"
 fi
@@ -80,6 +89,10 @@ if ! curl --fail --silent --show-error "${HEALTH_URL}" >/dev/null; then
   log "Healthcheck fehlgeschlagen; stelle vorherigen Quellstand wieder her."
   systemctl stop "${SERVICE_NAME}.service" || true
   rsync -a --delete --exclude '.venv/' --exclude '.env' --exclude '*.db' --exclude 'bedrock-long-term-api-key.csv' --exclude '.deployed-commit' "${backup_path}/" "${APP_DIR}/"
+  if [[ -n "${SERVICE_USER}" ]]; then
+    chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${APP_DIR}"
+    chmod 0755 "${APP_DIR}"
+  fi
   printf '%s\n' "${old_commit:-rollback}" > "${APP_DIR}/.deployed-commit"
   systemctl start "${SERVICE_NAME}.service"
   die "Rollback durchgeführt."
