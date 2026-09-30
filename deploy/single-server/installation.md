@@ -10,7 +10,7 @@ Diese Variante richtet einen einzelnen Debian-/Ubuntu-Server mit Python, Nginx u
 - offene Ports 80 und 443 in Firewall/Security Group
 - optional ein Bedrock-Zugang
 
-Das Skript installiert keine Datenbankserver. Standardmäßig wird SQLite unter `/var/lib/aborodesk/ki_email.db` verwendet. Für mehrere Worker oder höhere Last sollte später PostgreSQL ergänzt werden.
+Das Skript installiert keinen Datenbankserver. Die Anwendung verwendet die konfigurierte MongoDB als dauerhafte Persistenz.
 
 ## Installation
 
@@ -25,13 +25,16 @@ chmod +x deploy/single-server/install.sh
 Nur HTTP einrichten:
 
 ```bash
-sudo DOMAIN=mail.example.com deploy/single-server/install.sh
+sudo DOMAIN=mail.example.com \
+  MONGODB_URI='mongodb://aborodesk_app:<PASSWORT>@212.44.166.238:27017/aborodesk?authSource=admin' \
+  deploy/single-server/install.sh
 ```
 
 Mit Let's Encrypt direkt während der Installation:
 
 ```bash
 sudo DOMAIN=mail.example.com ENABLE_TLS=1 CERTBOT_EMAIL=admin@example.com \
+  MONGODB_URI='mongodb://aborodesk_app:<PASSWORT>@212.44.166.238:27017/aborodesk?authSource=admin' \
   deploy/single-server/install.sh
 ```
 
@@ -45,6 +48,8 @@ Das Skript:
 - richtet `/etc/systemd/system/aborodesk.service` ein
 - legt Nginx als Reverse Proxy auf `127.0.0.1:8000` an
 - prüft die Anwendung über `/health`
+
+`MONGODB_URI` ist erforderlich. Das Passwort muss URL-kodiert werden, wenn es Sonderzeichen wie `@`, `:`, `/` oder `#` enthält. Danach wird MongoDB als dauerhafte Persistenz verwendet; eine SQLite-Produktionsdatei wird nicht angelegt.
 
 ## Erste Konfiguration
 
@@ -107,7 +112,7 @@ Wenn die Domain nicht erreichbar ist, zuerst DNS, Firewall, Nginx und anschließ
 
 ## Updates
 
-Vor jedem Update Datenbank und Environment-Datei sichern. Danach den neuen Quellcode übertragen und den Dienst neu starten:
+Vor jedem Update MongoDB und Environment-Datei sichern. Danach den neuen Quellcode übertragen und den Dienst neu starten:
 
 ```bash
 sudo rsync -a --exclude '.git/' --exclude '.venv/' --exclude '*.db' ./ /opt/aborodesk/
@@ -115,11 +120,11 @@ sudo -u aborodesk /opt/aborodesk/.venv/bin/pip install -r /opt/aborodesk/require
 sudo systemctl restart aborodesk
 ```
 
-Bei Änderungen am Schema den Startvorgang und die Logs kontrollieren. Für produktive Backups mindestens `/var/lib/aborodesk/ki_email.db` und `/etc/aborodesk/aborodesk.env` getrennt und verschlüsselt sichern.
+Bei Änderungen am Schema den Startvorgang und die Logs kontrollieren. Für produktive Backups die MongoDB-Datenbank `aborodesk` und `/etc/aborodesk/aborodesk.env` getrennt und verschlüsselt sichern.
 
 ## Produktionshinweise
 
-- SQLite ist für einen einzelnen, kleinen Server geeignet; bei wachsender Nutzung PostgreSQL einsetzen.
+- MongoDB-Backups und ein getesteter Restore sind Pflicht.
 - Regelmäßige Backups und ein getesteter Restore sind Pflicht.
 - Bedrock-, Mail- und SMTP-Zugangsdaten getrennt vom Quellcode verwalten.
 - Nginx-/systemd-Logs überwachen und Rotation einrichten.

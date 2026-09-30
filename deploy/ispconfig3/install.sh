@@ -13,6 +13,7 @@ SERVICE_NAME="${SERVICE_NAME:-aborodesk}"
 SERVICE_USER="${SERVICE_USER:-www-data}"
 SERVICE_GROUP="${SERVICE_GROUP:-${SERVICE_USER}}"
 APP_PORT="${APP_PORT:-8001}"
+MONGODB_URI="${MONGODB_URI:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # FTP-Layout des ISPConfig-Projekts: /web/app enthält app/, requirements.txt usw.
 # SOURCE_DIR kann für ein anderes Layout weiterhin überschrieben werden.
@@ -27,6 +28,7 @@ log() { echo "[AboroDesk] $*"; }
 [[ "${EUID}" -eq 0 ]] || die "Bitte als root ausführen."
 command -v apt-get >/dev/null || die "Dieses Skript erwartet Debian/Ubuntu mit apt-get."
 [[ -d "${SOURCE_DIR}/app" ]] || die "Quellverzeichnis nicht gefunden: ${SOURCE_DIR}"
+[[ -n "${MONGODB_URI}" ]] || die "MONGODB_URI muss auf mongodb://.../aborodesk gesetzt werden."
 id "${SERVICE_USER}" >/dev/null 2>&1 || die "SERVICE_USER existiert nicht: ${SERVICE_USER}. In ISPConfig den Web-Benutzer angeben."
 getent group "${SERVICE_GROUP}" >/dev/null || die "SERVICE_GROUP existiert nicht: ${SERVICE_GROUP}."
 log "Verwende Projektstamm: ${SOURCE_DIR}"
@@ -62,7 +64,7 @@ if [[ ! -f "${ETC_DIR}/${SERVICE_NAME}.env" ]]; then
   cat > "${ETC_DIR}/${SERVICE_NAME}.env" <<EOF
 APP_NAME=${APP_NAME}
 ENVIRONMENT=production
-DATABASE_URL=sqlite:////var/lib/aborodesk/ki_email.db
+DATABASE_URL=${MONGODB_URI}
 SECRET_KEY=${SECRET_KEY}
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=change-me-now

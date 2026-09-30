@@ -16,7 +16,7 @@ from sqlalchemy import delete, func, inspect, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db import Base, engine, get_db
+from app.db import Base, engine, get_db, initialize_persistence
 from app.models import Activity, AuditLog, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, OutgoingEmail, Permission, Role, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
@@ -190,6 +190,7 @@ async def lifespan(_: FastAPI):
             if ticket_columns and name not in ticket_columns:
                 with engine.begin() as connection:
                     connection.execute(text(f"ALTER TABLE tickets ADD COLUMN {name} {definition}"))
+    initialize_persistence()
     with next(get_db()) as db:
         permissions = {}
         for name in ROLE_PERMISSIONS:

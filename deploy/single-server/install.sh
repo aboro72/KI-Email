@@ -14,6 +14,7 @@ APP_PORT="${APP_PORT:-8000}"
 DOMAIN="${DOMAIN:-_}"
 ENABLE_TLS="${ENABLE_TLS:-0}"
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
+MONGODB_URI="${MONGODB_URI:-}"
 SOURCE_DIR="${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
 die() { echo "FEHLER: $*" >&2; exit 1; }
@@ -22,6 +23,7 @@ log() { echo "[AboroDesk] $*"; }
 [[ "${EUID}" -eq 0 ]] || die "Bitte als root ausführen."
 command -v apt-get >/dev/null || die "Dieses Skript erwartet Debian/Ubuntu mit apt-get."
 [[ -d "${SOURCE_DIR}/app" ]] || die "Quellverzeichnis nicht gefunden: ${SOURCE_DIR}"
+[[ -n "${MONGODB_URI}" ]] || die "MONGODB_URI muss auf mongodb://.../aborodesk gesetzt werden."
 [[ "${ENABLE_TLS}" != "1" || "${DOMAIN}" != "_" ]] || die "ENABLE_TLS=1 benötigt DOMAIN=deine-domain.tld."
 [[ "${ENABLE_TLS}" != "1" || -n "${CERTBOT_EMAIL}" ]] || die "ENABLE_TLS=1 benötigt CERTBOT_EMAIL."
 
@@ -63,7 +65,7 @@ if [[ ! -f "${ETC_DIR}/${SERVICE_NAME}.env" ]]; then
   cat > "${ETC_DIR}/${SERVICE_NAME}.env" <<EOF
 APP_NAME=${APP_NAME}
 ENVIRONMENT=production
-DATABASE_URL=sqlite:////var/lib/aborodesk/ki_email.db
+DATABASE_URL=${MONGODB_URI}
 SECRET_KEY=${SECRET_KEY}
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=change-me-now

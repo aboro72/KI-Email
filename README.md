@@ -45,3 +45,7 @@ Die technische Analyse steht in [docs/architecture.md](docs/architecture.md). Be
 - [Einzelserver-Installation](deploy/single-server/installation.md) mit [Installationsskript](deploy/single-server/install.sh)
 
 Die Skripte kopieren keine lokale Datenbank und keine API-Key-Datei. Zugangsdaten werden erst auf dem Zielserver über eine geschützte Environment-Datei bzw. ein Secret-Management hinterlegt.
+
+## MongoDB-Migration
+
+Die Anwendung kann mit einer MongoDB-URI betrieben werden. Für die einmalige Übernahme des bestehenden SQLite-Bestands steht [migrate_sqlite_to_mongo.py](scripts/migrate_sqlite_to_mongo.py) bereit. Die SQLite-Datei wird dabei nur gelesen und bleibt als Backup erhalten.

@@ -38,12 +38,15 @@ Der FTP-Upload allein installiert noch nichts. Danach per SSH am Server anmelden
 cd /web/app
 chmod +x deploy/ispconfig3/install.sh
 sudo SERVICE_USER=webXXX SERVICE_GROUP=clientY APP_PORT=8001 \
+  MONGODB_URI='mongodb://aborodesk_app:<PASSWORT>@212.44.166.238:27017/aborodesk?authSource=admin' \
   bash deploy/ispconfig3/install.sh
 ```
 
 `webXXX` und `clientY` müssen durch den Benutzer und die Gruppe der betreffenden ISPConfig-Website ersetzt werden. Wenn ein separater Systembenutzer verwendet werden soll, muss dieser vorher existieren und Zugriff auf die Installationsverzeichnisse erhalten. Falls Benutzer und Gruppe identisch sind, kann `SERVICE_GROUP` entfallen.
 
 Das Skript erkennt den Projektstamm unabhängig davon, ob es mit `bash deploy/ispconfig3/install.sh` oder direkt aus seinem Unterordner gestartet wird. Standardmäßig wird `/web/app` als Quelle verwendet.
+
+`MONGODB_URI` ist erforderlich. Das Passwort muss URL-kodiert werden, wenn es Sonderzeichen wie `@`, `:`, `/` oder `#` enthält. Die URI wird nur in `/etc/aborodesk/aborodesk.env` mit geschützten Dateirechten gespeichert.
 
 Der Standardquellpfad ist bereits `/web/app`. Bei einem anderen FTP-Ziel kann er ausdrücklich gesetzt werden:
 
