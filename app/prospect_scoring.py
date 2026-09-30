@@ -25,13 +25,13 @@ PRODUCT_PROFILES = (
         "aborolms",
         "ABoroLMS",
         ("lms", "learning management", "weiterbildung", "schulung", "schulungen", "kurse", "prüfung", "prüfungen", "zertifikat", "zertifikate", "zertifikaten", "akademie"),
-        ("lernplattform", "teilnehmer", "lernende", "trainer", "prüfer", "online-kurse", "e-learning"),
+        ("lernplattform", "teilnehmer", "lernende", "trainer", "prüfer", "online-kurse", "online", "e-learning"),
     ),
     ProductProfile(
         "cloudshare",
         "CloudShare",
         ("dateiaustausch", "dokumentenaustausch", "dateifreigabe", "cloud", "kundenportal", "partnerportal", "große dateien"),
-        ("zugriffsrechte", "sensible dokumente", "externe partner", "mehrere standorte", "versionschaos", "sicher teilen"),
+        ("zugriffsrechte", "sensible dokumente", "externe partner", "mehrere standorte", "versionschaos", "sicher teilen", "sicherem dokumentenaustausch"),
     ),
     ProductProfile(
         "helpdesk",
