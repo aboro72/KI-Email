@@ -12,9 +12,19 @@ SERVICE_NAME="${SERVICE_NAME:-aborodesk}"
 GIT_BRANCH="${GIT_BRANCH:-master}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8001/health}"
 LOCK_FILE="${LOCK_FILE:-/run/lock/aborodesk-update.lock}"
+UPDATE_STATUS_FILE="${UPDATE_STATUS_FILE:-/var/lib/aborodesk-updater/status.json}"
 
 log() { echo "[$(date --iso-8601=seconds)] [AboroDesk-Update] $*"; }
 die() { log "FEHLER: $*"; exit 1; }
+write_status() {
+  local state="$1" commit="$2" message="$3" temporary
+  temporary="${UPDATE_STATUS_FILE}.tmp"
+  install -d -m 0755 "$(dirname "${UPDATE_STATUS_FILE}")"
+  printf '{"state":"%s","commit":"%s","message":"%s","checked_at":"%s"}\n' \
+    "$state" "$commit" "$message" "$(date --iso-8601=seconds)" > "${temporary}"
+  chmod 0644 "${temporary}"
+  mv -f "${temporary}" "${UPDATE_STATUS_FILE}"
+}
 
 [[ "${EUID}" -eq 0 ]] || die "Bitte als root ausführen."
 command -v git >/dev/null || die "git ist nicht installiert."
@@ -44,6 +54,7 @@ if [[ -f "${APP_DIR}/.deployed-commit" ]]; then
 fi
 
 if [[ "${new_commit}" == "${old_commit}" ]]; then
+  write_status "current" "${new_commit}" "Keine neuen Updates"
   log "Keine Änderung (${new_commit:0:12})."
   exit 0
 fi
@@ -65,6 +76,7 @@ systemctl restart "${SERVICE_NAME}.service"
 sleep 3
 
 if ! curl --fail --silent --show-error "${HEALTH_URL}" >/dev/null; then
+  write_status "rollback" "${old_commit:-}" "Update fehlgeschlagen; vorheriger Stand wiederhergestellt"
   log "Healthcheck fehlgeschlagen; stelle vorherigen Quellstand wieder her."
   systemctl stop "${SERVICE_NAME}.service" || true
   rsync -a --delete --exclude '.venv/' --exclude '.env' --exclude '*.db' --exclude 'bedrock-long-term-api-key.csv' --exclude '.deployed-commit' "${backup_path}/" "${APP_DIR}/"
@@ -74,4 +86,5 @@ if ! curl --fail --silent --show-error "${HEALTH_URL}" >/dev/null; then
 fi
 
 find "${BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf -- {} +
+write_status "updated" "${new_commit}" "Neues Update wurde installiert"
 log "Update erfolgreich: ${new_commit:0:12}."

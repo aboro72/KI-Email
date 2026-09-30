@@ -136,6 +136,8 @@ sudo REPOSITORY_URL='https://github.com/aboro72/KI-Email.git' \
 
 Bei privaten Repositories einen SSH-Deploy-Key oder einen eingerichteten Git-Credential-Helper verwenden. Der Timer prüft alle 20 Minuten, installiert neue Python-Abhängigkeiten, startet den Dienst neu und prüft `/health`. Bei einem Fehler wird der vorherige Quellstand wiederhergestellt.
 
+Der Update-Dienst schreibt seinen Status nach `/var/lib/aborodesk-updater/status.json`. Das Dashboard zeigt dadurch an, ob die Anwendung aktuell ist, wann ein Update installiert wurde oder ob ein Rollback erfolgt ist.
+
 ```bash
 sudo systemctl list-timers aborodesk-update.timer
 sudo journalctl -u aborodesk-update.service -f

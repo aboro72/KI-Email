@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     bedrock_region: str = "eu-central-1"
     bedrock_model_id: str = "eu.anthropic.claude-sonnet-4-6"
     bedrock_api_key_file: str = "bedrock-long-term-api-key.csv"
+    update_status_file: str = "/var/lib/aborodesk-updater/status.json"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

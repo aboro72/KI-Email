@@ -7,6 +7,7 @@ SERVICE_NAME="${SERVICE_NAME:-aborodesk}"
 APP_PORT="${APP_PORT:-8001}"
 APP_DIR="${APP_DIR:-/opt/aborodesk}"
 SOURCE_DIR="${SOURCE_DIR:-/var/lib/aborodesk-updater/source}"
+UPDATE_STATUS_FILE="${UPDATE_STATUS_FILE:-/var/lib/aborodesk-updater/status.json}"
 CONFIG_DIR="${CONFIG_DIR:-/etc/aborodesk}"
 CONFIG_FILE="${CONFIG_DIR}/update.env"
 
@@ -21,6 +22,7 @@ REPOSITORY_URL=${REPOSITORY_URL}
 GIT_BRANCH=${GIT_BRANCH}
 APP_DIR=${APP_DIR}
 SOURCE_DIR=${SOURCE_DIR}
+UPDATE_STATUS_FILE=${UPDATE_STATUS_FILE}
 SERVICE_NAME=${SERVICE_NAME}
 HEALTH_URL=http://127.0.0.1:${APP_PORT}/health
 EOF

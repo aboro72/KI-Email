@@ -23,6 +23,15 @@ from app.security import create_session, csrf_matches, current_user, decrypt_sec
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
+
+def _update_status() -> dict:
+    path = Path(get_settings().update_status_file)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return {}
+
 ROLE_PERMISSIONS = {
     "EMAIL_VIEW": "E-Mail-Postfächer lesen",
     "EMAIL_SEND": "E-Mails versenden",
@@ -340,7 +349,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     sent_count = db.scalar(select(func.count()).select_from(OutgoingEmail).where(OutgoingEmail.created_by_user_id == user.id, OutgoingEmail.status == "sent")) or 0
     can_crm = any(item.name == "CRM_MANAGE" for item in user.role.permissions)
     can_helpdesk = any(item.name == "HELPDESK_VIEW" for item in user.role.permissions)
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk})
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk, "update_status": _update_status()})
 
 
 @app.get("/admin", response_class=HTMLResponse)

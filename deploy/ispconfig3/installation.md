@@ -179,6 +179,8 @@ Für ein privates Repository sollte statt eines Tokens in der URL ein SSH-Deploy
 
 Der Timer prüft alle 20 Minuten und aktualisiert nur bei einem neuen Commit. Vorher wird der aktuelle Anwendungscode unter `/var/backups/aborodesk/` gesichert. Nach dem Neustart wird `/health` geprüft; bei Fehlern erfolgt ein Code-Rollback. MongoDB wird nicht überschrieben, da sie außerhalb des Anwendungscodes liegt.
 
+Der Update-Dienst schreibt seinen Status nach `/var/lib/aborodesk-updater/status.json`. Das Dashboard zeigt dadurch an, ob die Anwendung aktuell ist, wann ein Update installiert wurde oder ob ein Rollback erfolgt ist.
+
 Kontrolle:
 
 ```bash
