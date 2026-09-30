@@ -101,6 +101,10 @@ Die erste Suche erzeugte auch unpassende Treffer wie Medienseiten, Verzeichnisse
 
 ## Wichtigster nächster Schritt: Datenpersistenz und Worker korrigieren
 
+### Nachtrag: Bedrock-Dateizugriff korrigiert
+
+Am 30.09.2026 wurde der erneut gemeldete `Permission denied` geprüft: `/etc/aborodesk` hatte `root:root` und `0750`, während die App unter `web29:client2` läuft. Die Schlüsseldatei war bereits `root:client2` mit `0640`. Die Verzeichnisgruppe wurde auf `client2` korrigiert, der Modus blieb `0750`. Ein Öffnungstest als `web29:client2` war erfolgreich. Die Webanwendung wurde neu gestartet. Diese Rechtekorrektur behebt den Dateizugriff; sie bestätigt weder die Bedrock-Anmeldung noch eine funktionierende Recherchequeue. Die Installationsscripts setzen die Verzeichnisgruppe bereits korrekt; die Ursache des abweichenden Serverstands ist nicht geklärt.
+
 1. **Zuerst ein aktuelles Backup erstellen und prüfen.** Danach parallele Schreibprozesse für Diagnose/Umstellung kontrolliert anhalten.
 2. `app/db.py` überarbeiten: Jeder Prozess lädt MongoDB beim Start in eine eigene SQLite-In-Memory-Datenbank. Jeder Commit löscht die MongoDB-Collections und schreibt den gesamten lokalen Bestand zurück. Webapp, Worker und Suchscript können dadurch gegenseitig neuere Daten überschreiben. Das ist anhand des Codes bestätigt; welche Daten bereits betroffen sind, muss untersucht werden.
 3. Ziel: MongoDB atomar und direkt für produktive Daten/Queue verwenden, ohne vollständiges Löschen/Neuschreiben bei jedem Commit. Mehrere Prozesse müssen denselben aktuellen Zustand sehen. Eine vollständige Umstellung braucht durchgängige Prüfung der bisher SQLAlchemy-basierten Zugriffe.
