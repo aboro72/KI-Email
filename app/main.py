@@ -1043,7 +1043,7 @@ def create_user(
     display_name: str = Form(...),
     password: str = Form(...),
     role_id: int = Form(...),
-    email_account_ids: list[int] = Form(...),
+    email_account_ids: list[int] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     """Nur ein Administrator darf neue Benutzer für ein E-Mail-Konto anlegen."""
@@ -1117,7 +1117,7 @@ def update_user(
     display_name: str = Form(...),
     password: str = Form(""),
     role_id: int = Form(...),
-    email_account_ids: list[int] = Form(...),
+    email_account_ids: list[int] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     admin = require_user(request, db)
