@@ -32,15 +32,18 @@ Lade den kompletten Projektordner per FTP so hoch, dass die Struktur auf dem Ser
 
 Wichtig: Nur die beiden Dateien aus `deploy/ispconfig3` reichen nicht aus. Das Skript benötigt den vollständigen Projektstamm `/web/app` mit `app/` und `requirements.txt`.
 
-Der FTP-Upload allein installiert noch nichts. Danach per SSH am Server anmelden und die Installation mit Root- oder sudo-Rechten ausführen:
+Der FTP-Upload allein installiert noch nichts. Danach per SSH am Server anmelden und die Installation aus dem Projektstamm `/web/app` mit Root- oder sudo-Rechten ausführen:
 
 ```bash
-cd /web/app/deploy/ispconfig3
-chmod +x install.sh
-sudo SERVICE_USER=webXXX SERVICE_GROUP=clientY APP_PORT=8001 ./install.sh
+cd /web/app
+chmod +x deploy/ispconfig3/install.sh
+sudo SERVICE_USER=webXXX SERVICE_GROUP=clientY APP_PORT=8001 \
+  bash deploy/ispconfig3/install.sh
 ```
 
 `webXXX` und `clientY` müssen durch den Benutzer und die Gruppe der betreffenden ISPConfig-Website ersetzt werden. Wenn ein separater Systembenutzer verwendet werden soll, muss dieser vorher existieren und Zugriff auf die Installationsverzeichnisse erhalten. Falls Benutzer und Gruppe identisch sind, kann `SERVICE_GROUP` entfallen.
+
+Das Skript erkennt den Projektstamm unabhängig davon, ob es mit `bash deploy/ispconfig3/install.sh` oder direkt aus seinem Unterordner gestartet wird. Standardmäßig wird `/web/app` als Quelle verwendet.
 
 Der Standardquellpfad ist bereits `/web/app`. Bei einem anderen FTP-Ziel kann er ausdrücklich gesetzt werden:
 

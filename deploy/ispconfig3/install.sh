@@ -29,6 +29,7 @@ command -v apt-get >/dev/null || die "Dieses Skript erwartet Debian/Ubuntu mit a
 [[ -d "${SOURCE_DIR}/app" ]] || die "Quellverzeichnis nicht gefunden: ${SOURCE_DIR}"
 id "${SERVICE_USER}" >/dev/null 2>&1 || die "SERVICE_USER existiert nicht: ${SERVICE_USER}. In ISPConfig den Web-Benutzer angeben."
 getent group "${SERVICE_GROUP}" >/dev/null || die "SERVICE_GROUP existiert nicht: ${SERVICE_GROUP}."
+log "Verwende Projektstamm: ${SOURCE_DIR}"
 
 log "Installiere Python-Laufzeit und rsync …"
 export DEBIAN_FRONTEND=noninteractive
