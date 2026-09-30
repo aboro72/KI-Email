@@ -39,23 +39,25 @@ class LinkParser(HTMLParser):
 
 
 def search(query: str, limit: int) -> list[str]:
-    url = "https://html.duckduckgo.com/html/?q=" + quote_plus(query)
-    request = Request(url, headers={"User-Agent": "AboroDesk-ProspectResearch/1.0"})
-    with urlopen(request, timeout=20) as response:
-        html = response.read(1_500_000).decode("utf-8", errors="ignore")
-    parser = LinkParser()
-    parser.feed(html)
     results = []
-    for href in parser.links:
-        target = parse_qs(urlparse("https:" + href).query).get("uddg", [""])[0] if href.startswith("//duckduckgo.com/l/?") else href
-        parsed = urlparse(target)
-        host = (parsed.hostname or "").lower().removeprefix("www.")
-        if parsed.scheme not in {"http", "https"} or not host or any(host == blocked or host.endswith("." + blocked) for blocked in BLOCKED_HOSTS):
-            continue
-        normalized = f"https://{host}/"
-        if normalized not in results:
-            results.append(normalized)
-        if len(results) >= limit:
+    for search_url in ("https://html.duckduckgo.com/html/?q=" + quote_plus(query), "https://www.bing.com/search?q=" + quote_plus(query)):
+        request = Request(search_url, headers={"User-Agent": "Mozilla/5.0 AboroDesk-ProspectResearch/1.0"})
+        with urlopen(request, timeout=20) as response:
+            html = response.read(1_500_000).decode("utf-8", errors="ignore")
+        parser = LinkParser()
+        parser.feed(html)
+        for href in parser.links:
+            target = parse_qs(urlparse("https:" + href).query).get("uddg", [""])[0] if href.startswith("//duckduckgo.com/l/?") else href
+            parsed = urlparse(target)
+            host = (parsed.hostname or "").lower().removeprefix("www.")
+            if parsed.scheme not in {"http", "https"} or not host or any(host == blocked or host.endswith("." + blocked) for blocked in BLOCKED_HOSTS):
+                continue
+            normalized = f"https://{host}/"
+            if normalized not in results:
+                results.append(normalized)
+            if len(results) >= limit:
+                return results
+        if results:
             break
     return results
 
