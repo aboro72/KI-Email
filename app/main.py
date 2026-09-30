@@ -12,7 +12,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import delete, func, inspect, or_, select, text
+from sqlalchemy import delete, func, inspect, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -150,6 +150,8 @@ def research_company_background(company_id: int) -> None:
             company.research_status = "failed"
             company.research_error = str(exc)[:1000]
             db.commit()
+        # Der Worker muss den Fehlschlag kennen, damit Retry und Jobstatus stimmen.
+        raise
     finally:
         db.close()
 
@@ -720,10 +722,16 @@ def delete_company(company_id: int, request: Request, db: Session = Depends(get_
         return RedirectResponse("/crm/companies?message=Firma+nicht+gefunden", status_code=303)
 
     contact_ids = [contact.id for contact in db.scalars(select(Contact).where(Contact.company_id == company.id)).all()]
+    lead_ids = [lead.id for lead in db.scalars(select(Lead).where(Lead.company_id == company.id)).all()]
     # Kampagnenhistorien bleiben erhalten; nur die optionale CRM-Verknüpfung wird gelöst.
     if contact_ids:
-        db.execute(delete(MarketingRecipient).where(MarketingRecipient.contact_id.in_(contact_ids)).values(contact_id=None))
-    db.execute(delete(Activity).where(Activity.company_id == company.id))
+        db.execute(update(MarketingRecipient).where(MarketingRecipient.contact_id.in_(contact_ids)).values(contact_id=None))
+    activity_links = [Activity.company_id == company.id]
+    if contact_ids:
+        activity_links.append(Activity.contact_id.in_(contact_ids))
+    if lead_ids:
+        activity_links.append(Activity.lead_id.in_(lead_ids))
+    db.execute(delete(Activity).where(or_(*activity_links)))
     db.execute(delete(Lead).where(Lead.company_id == company.id))
     if contact_ids:
         db.execute(delete(Contact).where(Contact.id.in_(contact_ids)))

@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -6,8 +7,8 @@ from sqlalchemy.orm import sessionmaker
 
 from app.automation import emit_event, register_action
 from app.db import Base
-from app.jobs import enqueue, register_handler, run_pending
-from app.models import AutomationRule
+from app.jobs import enqueue, recover_stale_jobs, register_handler, run_pending
+from app.models import AutomationRule, BackgroundJob
 
 
 @pytest.fixture
@@ -50,3 +51,39 @@ def test_background_job_is_retried_and_then_completed(db_session):
     assert processed[0].id == job.id
     assert processed[0].status == "completed"
     assert calls == [{"message_id": 4}]
+
+
+def test_stale_running_job_is_released_for_retry(db_session):
+    job = BackgroundJob(
+        job_type="tests.job",
+        payload_json="{}",
+        status="running",
+        attempts=1,
+        max_attempts=3,
+        locked_at=datetime.now(timezone.utc) - timedelta(minutes=20),
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    assert recover_stale_jobs(db_session, stale_after_seconds=60) == 1
+    db_session.refresh(job)
+    assert job.status == "queued"
+    assert job.locked_at is None
+    assert "Worker-Neustart" in job.error
+
+
+def test_exhausted_stale_job_is_marked_failed(db_session):
+    job = BackgroundJob(
+        job_type="tests.job",
+        payload_json="{}",
+        status="running",
+        attempts=3,
+        max_attempts=3,
+        locked_at=datetime.now(timezone.utc) - timedelta(minutes=20),
+    )
+    db_session.add(job)
+    db_session.commit()
+
+    assert recover_stale_jobs(db_session, stale_after_seconds=60) == 1
+    db_session.refresh(job)
+    assert job.status == "failed"
