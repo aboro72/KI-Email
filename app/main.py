@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import Base, engine, get_db, initialize_persistence
 from app.jobs import enqueue
-from app.models import Activity, AuditLog, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
+from app.models import Activity, AuditLog, BackgroundJob, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
 from app.prospect_scoring import score_products
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
@@ -702,6 +702,37 @@ def crm_company_detail(company_id: int, request: Request, db: Session = Depends(
     activities = db.scalars(select(Activity).where(Activity.company_id == company.id).order_by(Activity.created_at.desc()).limit(20)).all()
     users = db.scalars(select(User).order_by(User.display_name)).all()
     return templates.TemplateResponse(request=request, name="crm_company_detail.html", context={"user": user, "company": company, "contacts": contacts, "leads": leads, "activities": activities, "users": users, "message": request.query_params.get("message")})
+
+
+@app.post("/crm/companies/{company_id}/delete")
+def delete_company(company_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    require_permission(user, "CRM_MANAGE")
+    company = db.get(Company, company_id)
+    if not company:
+        return RedirectResponse("/crm/companies?message=Firma+nicht+gefunden", status_code=303)
+
+    contact_ids = [contact.id for contact in db.scalars(select(Contact).where(Contact.company_id == company.id)).all()]
+    # Kampagnenhistorien bleiben erhalten; nur die optionale CRM-Verknüpfung wird gelöst.
+    if contact_ids:
+        db.execute(delete(MarketingRecipient).where(MarketingRecipient.contact_id.in_(contact_ids)).values(contact_id=None))
+    db.execute(delete(Activity).where(Activity.company_id == company.id))
+    db.execute(delete(Lead).where(Lead.company_id == company.id))
+    if contact_ids:
+        db.execute(delete(Contact).where(Contact.id.in_(contact_ids)))
+
+    # Noch nicht gestartete Recherchejobs dürfen nach dem Löschen nicht erneut anlaufen.
+    for job in db.scalars(select(BackgroundJob).where(BackgroundJob.job_type == "crm.company_research")).all():
+        try:
+            if int(json.loads(job.payload_json or "{}").get("company_id", -1)) == company.id:
+                db.delete(job)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+
+    db.add(AuditLog(action="COMPANY_DELETED", actor_user_id=user.id, details=json.dumps({"company_id": company.id, "company_name": company.name}, ensure_ascii=False)))
+    db.delete(company)
+    db.commit()
+    return RedirectResponse("/crm/companies?message=Firma+und+zugehörige+CRM-Daten+gelöscht", status_code=303)
 
 
 @app.get("/crm/contacts", response_class=HTMLResponse)
