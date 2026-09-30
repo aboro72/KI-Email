@@ -4,6 +4,10 @@ Stand: 30.09.2026
 
 Dieses Dokument ist die Arbeitsgrundlage für die weitere Entwicklung. Die Anwendung bleibt modular: Ein Modul kann deaktiviert werden, ohne dass E-Mail, CRM, Helpdesk, Marketing oder spätere Automationen gegenseitig zwingend benötigt werden.
 
+## Produktziel
+
+AboroDesk ist eine Einzelkundenlösung: Jede Installation gehört zu einem Kunden und läuft als eigene Umgebung mit eigener Datenbank, eigenen E-Mail-Konten und eigenen Benutzern. Eine Mandantenlösung innerhalb einer gemeinsamen Installation ist ausdrücklich nicht vorgesehen.
+
 ## Bereits umgesetzt
 
 - E-Mail-Postfächer, Posteingang, Entwürfe und Versandfreigabe
@@ -64,8 +68,21 @@ Noch offen: automatisierte Backups mit Wiederherstellungstest, zentrale Fehlerü
 - Mobile/PWA-Ansicht
 - Regel-Editor per Drag-and-drop
 - KI-Unterstützung für Klassifikation, Zusammenfassung und Antwortentwürfe – immer mit konfigurierbarer Freigabe
-- Mandantenfähigkeit für mehrere Firmen/Organisationen
+- Installationsassistent mit geführter Einrichtung für Datenbank, Admin, E-Mail und Backups
 - Plugin-Schnittstelle für zusätzliche Module
+
+## Anforderungen für die spätere Verkaufs-Version
+
+- Ein klarer Installationsweg für ISPConfig3 und Einzelserver
+- Konfiguration über eine verständliche `.env`- oder Web-Oberfläche statt manueller Codeänderungen
+- Prüfung der Systemvoraussetzungen vor der Installation
+- Ein eigener Installations- und Update-Status mit verständlichen Fehlermeldungen
+- Sichere Ersteinrichtung für Admin-Konto, SECRET_KEY, MongoDB und E-Mail-Konten
+- Backup- und Wiederherstellungsassistent pro Kundeninstallation
+- Lizenzschlüssel oder Aktivierung nur dann, wenn das Geschäftsmodell dies später benötigt
+- Deaktivierbare Module, damit Kunden nur die benötigten Funktionen betreiben
+- Dokumentierte Upgrade- und Rollback-Möglichkeit
+- Keine zentrale Kundendatenbank und keine Vermischung von Kundendaten
 
 ## Definition of Done je Modul
 

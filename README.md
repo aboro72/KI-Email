@@ -6,6 +6,8 @@ Der laufende Umsetzungsstand, die Reihenfolge der nächsten Ausbaustufen und opt
 
 Modularer, KI-gestützter Multi-Account-E-Mail-Arbeitsplatz. Phase 1 liefert ein ausführbares FastAPI-Grundgerüst mit Benutzerverwaltung, Rollen/Rechten, sicherem Secret-Speicher, Dashboard und technisch erzwungener Human-in-the-Loop-Versandfreigabe.
 
+Das Produkt ist als Einzelkundenlösung ausgelegt: Pro Kunde gibt es eine getrennte Installation mit eigener Datenbank und eigener Konfiguration. Eine gemeinsame Mandanteninstallation ist nicht Bestandteil der Planung.
+
 ## Start
 
 ```powershell
