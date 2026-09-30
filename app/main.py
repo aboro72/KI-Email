@@ -33,6 +33,13 @@ def _update_status() -> dict:
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         return {}
 
+
+def _available_email_accounts(user: User, db: Session) -> list[EmailAccount]:
+    """Admins dürfen alle aktiven Postfächer prüfen; andere Nutzer nur ihre Zuweisungen."""
+    if user.role and user.role.name == "admin":
+        return db.scalars(select(EmailAccount).where(EmailAccount.is_active).order_by(EmailAccount.email_address)).all()
+    return [account for account in user.email_accounts if account.is_active]
+
 ROLE_PERMISSIONS = {
     "EMAIL_VIEW": "E-Mail-Postfächer lesen",
     "EMAIL_SEND": "E-Mails versenden",
@@ -345,7 +352,7 @@ def logout():
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
-    account_ids = [account.id for account in user.email_accounts if account.is_active]
+    account_ids = [account.id for account in _available_email_accounts(user, db)]
     drafts = db.scalars(select(Draft).order_by(Draft.created_at.desc())).all()
     logs = db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(8)).all()
     unread_count = db.scalar(select(func.count()).select_from(EmailMessage).where(EmailMessage.account_id.in_(account_ids), EmailMessage.is_read.is_(False))) if account_ids else 0
@@ -939,7 +946,7 @@ def create_activity(request: Request, company_id: int | None = Form(None), lead_
 @app.get("/compose", response_class=HTMLResponse)
 def compose_page(request: Request, reply_to: int | None = None, forward: int | None = None, db: Session = Depends(get_db)):
     user = require_user(request, db)
-    accounts = [account for account in user.email_accounts if account.is_active]
+    accounts = _available_email_accounts(user, db)
     source = db.get(EmailMessage, reply_to or forward) if (reply_to or forward) else None
     if source and source.account_id not in {account.id for account in accounts}:
         source = None
@@ -998,7 +1005,7 @@ async def compose_email(
 @app.get("/inbox", response_class=HTMLResponse)
 def inbox(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
-    available_accounts = [account for account in user.email_accounts if account.is_active]
+    available_accounts = _available_email_accounts(user, db)
     account_id = request.query_params.get("account_id")
     account = next((item for item in available_accounts if account_id and account_id.isdigit() and item.id == int(account_id)), None)
     if not account:
@@ -1035,7 +1042,7 @@ def inbox(request: Request, db: Session = Depends(get_db)):
 def read_message_html(message_id: int, request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     message = db.get(EmailMessage, message_id)
-    allowed_account_ids = {account.id for account in user.email_accounts if account.is_active}
+    allowed_account_ids = {account.id for account in _available_email_accounts(user, db)}
     if not message or message.account_id not in allowed_account_ids or not message.body_html:
         raise HTTPException(status_code=404, detail="Keine HTML-Nachricht vorhanden")
     return HTMLResponse(
@@ -1048,7 +1055,7 @@ def read_message_html(message_id: int, request: Request, db: Session = Depends(g
 def read_message(message_id: int, request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     message = db.get(EmailMessage, message_id)
-    allowed_account_ids = {account.id for account in user.email_accounts if account.is_active}
+    allowed_account_ids = {account.id for account in _available_email_accounts(user, db)}
     if not message or message.account_id not in allowed_account_ids:
         return RedirectResponse("/inbox", status_code=303)
     message.is_read = True
@@ -1060,7 +1067,7 @@ def read_message(message_id: int, request: Request, db: Session = Depends(get_db
 def delete_message(message_id: int, request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     message = db.get(EmailMessage, message_id)
-    allowed_account_ids = {account.id for account in user.email_accounts if account.is_active}
+    allowed_account_ids = {account.id for account in _available_email_accounts(user, db)}
     if message and message.account_id in allowed_account_ids:
         message.is_deleted = True
         db.add(AuditLog(action="EMAIL_MOVED_TO_TRASH", actor_user_id=user.id, details=f'{{"message_id": {message.id}}}'))
@@ -1071,7 +1078,7 @@ def delete_message(message_id: int, request: Request, db: Session = Depends(get_
 @app.get("/trash", response_class=HTMLResponse)
 def inbox_trash(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
-    allowed_account_ids = {account.id for account in user.email_accounts if account.is_active}
+    allowed_account_ids = {account.id for account in _available_email_accounts(user, db)}
     messages = db.scalars(select(EmailMessage).where(EmailMessage.account_id.in_(allowed_account_ids), EmailMessage.is_deleted.is_(True)).order_by(EmailMessage.received_at.desc())).all() if allowed_account_ids else []
     return templates.TemplateResponse(request=request, name="trash.html", context={"user": user, "messages": messages})
 
@@ -1080,7 +1087,7 @@ def inbox_trash(request: Request, db: Session = Depends(get_db)):
 def restore_message(message_id: int, request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     message = db.get(EmailMessage, message_id)
-    allowed_account_ids = {account.id for account in user.email_accounts if account.is_active}
+    allowed_account_ids = {account.id for account in _available_email_accounts(user, db)}
     if message and message.account_id in allowed_account_ids:
         message.is_deleted = False
         db.add(AuditLog(action="EMAIL_RESTORED", actor_user_id=user.id, details=f'{{"message_id": {message.id}}}'))
@@ -1093,7 +1100,7 @@ def destroy_message(message_id: int, request: Request, db: Session = Depends(get
     """Entfernt eine Nachricht endgültig aus AboroDesk, nur aus dem Papierkorb."""
     user = require_user(request, db)
     message = db.get(EmailMessage, message_id)
-    allowed_account_ids = {account.id for account in user.email_accounts if account.is_active}
+    allowed_account_ids = {account.id for account in _available_email_accounts(user, db)}
     if message and message.account_id in allowed_account_ids and message.is_deleted:
         db.add(AuditLog(action="EMAIL_DELETED_PERMANENTLY", actor_user_id=user.id, details=f'{{"message_id": {message.id}}}'))
         db.delete(message)
@@ -1105,7 +1112,7 @@ def destroy_message(message_id: int, request: Request, db: Session = Depends(get
 def ai_assist_message(message_id: int, request: Request, action: str = Form("analyze"), db: Session = Depends(get_db)):
     user = require_user(request, db)
     message = db.get(EmailMessage, message_id)
-    allowed_account_ids = {account.id for account in user.email_accounts if account.is_active}
+    allowed_account_ids = {account.id for account in _available_email_accounts(user, db)}
     if not message or message.account_id not in allowed_account_ids:
         return RedirectResponse("/inbox", status_code=303)
     from app.bedrock import analyze_email, assist_email
@@ -1126,7 +1133,7 @@ def ai_assist_message(message_id: int, request: Request, action: str = Form("ana
 def reply_to_message(message_id: int, request: Request, body: str = Form(...), action: str = Form("save"), db: Session = Depends(get_db)):
     user = require_user(request, db)
     message = db.get(EmailMessage, message_id)
-    allowed_account_ids = {account.id for account in user.email_accounts if account.is_active}
+    allowed_account_ids = {account.id for account in _available_email_accounts(user, db)}
     if not message or message.account_id not in allowed_account_ids:
         return RedirectResponse("/inbox", status_code=303)
     account = db.get(EmailAccount, message.account_id)
