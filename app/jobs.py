@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import BackgroundJob
+from app.models import BackgroundJob, Notification, Task
 
 Handler = Callable[[Session, Mapping[str, object]], None]
 _HANDLERS: dict[str, Handler] = {}
@@ -32,6 +32,14 @@ def enqueue(db: Session, job_type: str, payload: Mapping[str, object], *, max_at
 def run_pending(db: Session, *, limit: int = 10) -> list[BackgroundJob]:
     """Verarbeitet eine begrenzte Anzahl Jobs; ein Worker kann diese Funktion zyklisch aufrufen."""
     now = datetime.now(timezone.utc)
+    # Erinnerungen werden idempotent erzeugt: pro Aufgabe genau eine fällige Meldung.
+    due_tasks = db.scalars(select(Task).where(Task.status == "open", Task.due_at.is_not(None), Task.due_at <= now, Task.reminder_sent_at.is_(None))).all()
+    for task in due_tasks:
+        recipient_id = task.assigned_to_user_id or task.created_by_user_id
+        db.add(Notification(user_id=recipient_id, title="Aufgabe fällig", message=task.title, url="/tasks"))
+        task.reminder_sent_at = now
+    if due_tasks:
+        db.commit()
     jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.status == "queued", BackgroundJob.available_at <= now).order_by(BackgroundJob.created_at).limit(limit)).all()
     for job in jobs:
         job.status = "running"

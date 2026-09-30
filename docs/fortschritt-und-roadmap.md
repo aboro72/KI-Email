@@ -28,21 +28,23 @@ AboroDesk ist eine Einzelkundenlösung: Jede Installation gehört zu einem Kunde
 
 Vorhanden sind jetzt ein gemeinsames Ereignismodell, einfache Bedingungen, registrierbare Modul-Aktionen und ein Audit-fähiger Laufstatus. Als Nächstes müssen CRM-, Helpdesk- und E-Mail-Ereignisse angeschlossen werden. Automatische Aktionen mit Außenwirkung bleiben zunächst freigabepflichtig.
 
-### 2. Hintergrundaufgaben – umgesetzt, fachliche Handler noch offen
+### 2. Hintergrundaufgaben – umgesetzt
 
 Eine dauerhafte Datenbank-Warteschlange mit Wiederholungsversuchen, Fehlerstatus und registrierbaren Modul-Handlern ist jetzt vorhanden. Noch offen: ein produktiver systemd-Worker, der die Queue regelmäßig abarbeitet, sowie die Anbindung der konkreten E-Mail-, KI- und Erinnerungsaufgaben. Für mehrere Server bleiben Redis/RQ oder Celery optionale Skalierungsvarianten.
 
-Der produktive Worker ist jetzt als `deploy/install-worker.sh` vorhanden. Er verarbeitet die Queue alle zehn Sekunden und startet nach Fehlern automatisch neu.
+Der produktive Worker ist jetzt als `deploy/install-worker.sh` vorhanden. Er verarbeitet die Queue alle zehn Sekunden und startet nach Fehlern automatisch neu. Postfach-Synchronisierung, CRM-Recherche und Helpdesk-KI sind als konkrete Handler angebunden.
 
 ### 3. Aufgaben, Erinnerungen und Benachrichtigungen – Grundversion umgesetzt
 
-Vorhanden sind eine zentrale Aufgabenliste, Fälligkeit, Priorität, Erledigung und ungelesene Benachrichtigungen. Noch offen sind automatische Erinnerungsjobs, wiederkehrende Aufgaben und die automatische Erzeugung aus CRM-/Helpdesk-Ereignissen.
+Vorhanden sind eine zentrale Aufgabenliste, Fälligkeit, Priorität, Erledigung und ungelesene Benachrichtigungen. Fällige Aufgaben erzeugen über den Worker einmalig eine Benachrichtigung. Noch offen sind wiederkehrende Aufgaben und weitere Ereignisquellen aus CRM/Helpdesk.
 
 ### 4. Globale Suche und einheitliche Oberfläche – Grundversion umgesetzt
 
-Die zentrale Suche deckt E-Mails, Firmen, Kontakte und Helpdesk-Tickets ab. Noch offen sind Kampagnen, Wissensartikel, Leads, bessere Filter und eine dauerhaft sichtbare Suchleiste in der Hauptnavigation.
+Die zentrale Suche deckt E-Mails, Firmen, Kontakte, Helpdesk-Tickets, Kampagnen, Leads und Wissensartikel ab. Offen sind bessere Filter und die dauerhaft sichtbare Suchleiste in allen Hauptnavigationen.
 
 Die Installations-Vorprüfung ist als `deploy/preflight.sh` vorhanden und kontrolliert Projektdateien, Werkzeuge, Python-Version und optional die MongoDB-URI. Ein vollständig grafischer Installationsassistent ist weiterhin optional offen.
+
+Der tägliche Backup-Timer ist als `deploy/install-backup-timer.sh` vorhanden. Ein echter Restore-Test bleibt eine Serveraufgabe und muss auf dem Linux-Zielsystem mit einem Testbestand durchgeführt werden.
 
 ## Betrieb: Worker und Backups
 

@@ -161,6 +161,12 @@ sudo APP_DIR=/opt/aborodesk SERVICE_NAME=aborodesk SERVICE_USER=webXXX SERVICE_G
 
 Für tägliche Backups die MongoDB Database Tools installieren und `deploy/backup-mongodb.sh` per Cron oder systemd ausführen. Eine Wiederherstellung erfolgt kontrolliert mit `deploy/restore-mongodb.sh`; vorher immer den laufenden Dienst stoppen und ein aktuelles Backup anlegen.
 
+Den täglichen systemd-Timer aktivieren:
+
+```bash
+sudo APP_DIR=/opt/aborodesk SERVICE_NAME=aborodesk MONGODB_URI='mongodb://BENUTZER:PASSWORT@SERVER:27017/aborodesk?authSource=admin' bash /opt/aborodesk/deploy/install-backup-timer.sh
+```
+
 ```bash
 sudo systemctl status aborodesk
 sudo journalctl -u aborodesk -f

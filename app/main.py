@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import Base, engine, get_db, initialize_persistence
+from app.jobs import enqueue
 from app.models import Activity, AuditLog, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
@@ -418,6 +419,12 @@ def global_search(request: Request, q: str = "", db: Session = Depends(get_db)):
             results.append({"kind": "Ticket", "title": f"{item.ticket_number} · {item.subject}", "detail": item.status, "url": f"/helpdesk/tickets/{item.id}"})
         for item in db.scalars(select(EmailMessage).where(or_(EmailMessage.sender.ilike(term), EmailMessage.subject.ilike(term), EmailMessage.body_text.ilike(term))).limit(10)).all():
             results.append({"kind": "E-Mail", "title": item.subject or "(ohne Betreff)", "detail": item.sender, "url": f"/inbox/{item.id}"})
+        for item in db.scalars(select(Lead).where(or_(Lead.status.ilike(term), Lead.next_action.ilike(term), Lead.notes.ilike(term))).limit(10)).all():
+            results.append({"kind": "Lead", "title": f"Lead #{item.id}", "detail": item.status, "url": "/crm/leads"})
+        for item in db.scalars(select(MarketingCampaign).where(or_(MarketingCampaign.name.ilike(term), MarketingCampaign.subject.ilike(term), MarketingCampaign.body.ilike(term))).limit(10)).all():
+            results.append({"kind": "Kampagne", "title": item.name, "detail": item.subject, "url": f"/marketing/campaigns/{item.id}"})
+        for item in db.scalars(select(KnowledgeArticle).where(or_(KnowledgeArticle.title.ilike(term), KnowledgeArticle.summary.ilike(term), KnowledgeArticle.content.ilike(term), KnowledgeArticle.keywords.ilike(term))).limit(10)).all():
+            results.append({"kind": "Wissensartikel", "title": item.title, "detail": item.product, "url": "/helpdesk/knowledge"})
     return templates.TemplateResponse(request=request, name="search.html", context={"user": user, "query": query, "results": results})
 
 
@@ -822,20 +829,7 @@ def helpdesk_ticket_ai(ticket_id: int, request: Request, db: Session = Depends(g
         return RedirectResponse("/helpdesk", status_code=303)
     articles = db.scalars(select(KnowledgeArticle).where(KnowledgeArticle.status == "published").limit(5)).all()
     context = "\n\n".join(f"{item.product}: {item.title}\n{item.summary}\n{item.content[:1200]}" for item in articles)
-    from app.bedrock import assist_ticket
-    try:
-        result = assist_ticket(ticket.subject, ticket.description, context)
-        ticket.ai_summary = result["summary"]
-        ticket.ai_reply_draft = result["reply_draft"]
-        ticket.ai_research_suggestion = result["research_suggestion"]
-        ticket.ai_confidence = result["confidence"]
-        ticket.support_level = max(1, min(int(result["support_level"] or 1), 3))
-        if result["priority"] in {"niedrig", "normal", "hoch", "kritisch"}:
-            ticket.priority = result["priority"]
-        db.add(AuditLog(action="HELPDESK_AI_ANALYSIS", actor_user_id=user.id, details=f'{{"ticket_id": {ticket.id}}}'))
-        db.commit()
-    except Exception:
-        pass
+    enqueue(db, "helpdesk.ai_analysis", {"ticket_id": ticket.id})
     return RedirectResponse(f"/helpdesk/tickets/{ticket.id}", status_code=303)
 
 
@@ -877,7 +871,7 @@ def create_company(background_tasks: BackgroundTasks, request: Request, name: st
     db.add(AuditLog(action="COMPANY_CREATED", actor_user_id=user.id, details="{}"))
     db.commit()
     if company.website:
-        background_tasks.add_task(research_company_background, company.id)
+        enqueue(db, "crm.company_research", {"company_id": company.id})
     return RedirectResponse(f"/crm/companies/{company.id}?message=Firma+gespeichert", status_code=303)
 
 
@@ -909,7 +903,7 @@ def rerun_company_research(company_id: int, background_tasks: BackgroundTasks, r
     company.research_status = "pending"
     company.research_error = ""
     db.commit()
-    background_tasks.add_task(research_company_background, company.id)
+    enqueue(db, "crm.company_research", {"company_id": company.id})
     return RedirectResponse(f"/crm/companies/{company.id}?message=Recherche+gestartet", status_code=303)
 
 
@@ -1017,7 +1011,8 @@ def inbox(request: Request, db: Session = Depends(get_db)):
     priority = request.query_params.get("priority", "").strip()
     if account and should_sync:
         try:
-            imported = sync_account(account, db)
+            enqueue(db, "email.sync_account", {"account_id": account.id})
+            error = "Synchronisierung wurde als Hintergrundaufgabe eingeplant."
         except Exception as exception:
             error = f"Postfach konnte nicht abgerufen werden: {type(exception).__name__}"
     if account:

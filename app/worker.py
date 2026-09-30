@@ -7,6 +7,7 @@ import time
 
 from app.db import Base, SessionLocal, engine, initialize_persistence
 from app.jobs import run_pending
+import app.job_handlers  # noqa: F401 - registriert die Modul-Handler
 
 
 def main() -> None:
