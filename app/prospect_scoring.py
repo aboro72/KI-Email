@@ -24,7 +24,7 @@ PRODUCT_PROFILES = (
     ProductProfile(
         "aborolms",
         "ABoroLMS",
-        ("lms", "learning management", "weiterbildung", "schulung", "schulungen", "kurse", "prüfung", "zertifikat", "akademie"),
+        ("lms", "learning management", "weiterbildung", "schulung", "schulungen", "kurse", "prüfung", "prüfungen", "zertifikat", "zertifikate", "zertifikaten", "akademie"),
         ("lernplattform", "teilnehmer", "lernende", "trainer", "prüfer", "online-kurse", "e-learning"),
     ),
     ProductProfile(
@@ -37,7 +37,7 @@ PRODUCT_PROFILES = (
         "helpdesk",
         "HelpDesk",
         ("helpdesk", "ticketsystem", "ticket", "it-support", "kundensupport", "support-team", "kundenservice", "serviceanfragen"),
-        ("sla", "eskalation", "reaktionszeit", "lösungszeit", "serviceverträge", "technische hotline", "wissensdatenbank"),
+        ("sla", "eskalation", "eskalationen", "reaktionszeit", "lösungszeit", "serviceverträge", "technische hotline", "wissensdatenbank"),
     ),
 )
 

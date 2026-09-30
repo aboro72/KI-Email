@@ -2,7 +2,7 @@ from app.prospect_scoring import score_products
 
 
 def test_company_can_match_multiple_products():
-    results = score_products("IT-Support und Kundensupport mit Ticketsystem, SLA, Eskalationen und sicherem Dokumentenaustausch für Kunden")
+    results = score_products("IT-Support und Kundensupport mit Ticketsystem, SLA, Eskalationen, Serviceverträge und sicherem Dokumentenaustausch für Kunden")
     by_product = {item["product"]: item for item in results}
     assert by_product["helpdesk"]["score"] >= 70
     assert by_product["cloudshare"]["score"] >= 20
