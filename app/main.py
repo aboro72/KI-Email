@@ -323,6 +323,13 @@ async def browser_auth_handler(request: Request, exception: HTTPException):
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
 
+@app.get("/help", response_class=HTMLResponse)
+def user_help(request: Request, db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    permissions = {permission.name for permission in user.role.permissions}
+    return templates.TemplateResponse(request=request, name="help.html", context={"user": user, "permissions": permissions, "can_admin": "ADMIN_SETTINGS" in permissions})
+
+
 @app.get("/health")
 def health():
     # Ein kleiner Endpunkt für Docker, Monitoring und den schnellen Funktionstest.
