@@ -144,6 +144,8 @@ cd KI-Email
 git log -5 --oneline
 ```
 
+**Push-Ergebnis dieser Sitzung:** `git push origin master` ist erneut mit HTTP 403 gescheitert: Schreibzugriff für das angemeldete Konto `ML-PIT` auf `aboro72/KI-Email` verweigert. Hilfeseite und diese Übergabe sind lokal committed, aber noch nicht auf GitHub. Vor Weiterarbeit am Heim-PC entweder GitHub-Anmeldung/Schreibrechte korrigieren und erneut pushen oder den lokalen Projektstand separat mitnehmen. Diese Übergabe wird zusätzlich im SSH-Benutzerverzeichnis des Servers hinterlegt, damit sie von zu Hause abrufbar ist; sie allein ersetzt nicht den aktuellen Quellcode.
+
 Bei vorhandenem Checkout zuerst `git status` prüfen, eigene Änderungen erhalten, dann `git pull --ff-only`. Diese Datei lesen und beim Abschnitt „Datenpersistenz und Worker korrigieren“ fortsetzen. Produktionskonfiguration und Schlüsseldatei gehören nicht in Git und müssen separat verfügbar sein.
 
 ## Nützliche Serverprüfungen
