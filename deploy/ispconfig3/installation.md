@@ -15,6 +15,12 @@ Die Anwendung und Datenbank sollten nicht direkt aus dem öffentlichen ISPConfig
 
 ## Installation
 
+Vor der Installation die Zielumgebung prüfen:
+
+```bash
+sudo MONGODB_URI='mongodb://BENUTZER:PASSWORT@SERVER:27017/aborodesk?authSource=admin' bash /web/app/deploy/preflight.sh
+```
+
 ## FTP-Layout
 
 Lade den kompletten Projektordner per FTP so hoch, dass die Struktur auf dem Server wie folgt aussieht:

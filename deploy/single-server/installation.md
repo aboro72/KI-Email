@@ -14,6 +14,12 @@ Das Skript installiert keinen Datenbankserver. Die Anwendung verwendet die konfi
 
 ## Installation
 
+Vor der Installation die Zielumgebung prüfen:
+
+```bash
+sudo MONGODB_URI='mongodb://BENUTZER:PASSWORT@SERVER:27017/aborodesk?authSource=admin' bash /web/app/deploy/preflight.sh
+```
+
 Repository übertragen oder klonen und in das Projektverzeichnis wechseln:
 
 ```bash

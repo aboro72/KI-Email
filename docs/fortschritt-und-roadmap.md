@@ -42,6 +42,8 @@ Vorhanden sind eine zentrale Aufgabenliste, Fälligkeit, Priorität, Erledigung 
 
 Die zentrale Suche deckt E-Mails, Firmen, Kontakte und Helpdesk-Tickets ab. Noch offen sind Kampagnen, Wissensartikel, Leads, bessere Filter und eine dauerhaft sichtbare Suchleiste in der Hauptnavigation.
 
+Die Installations-Vorprüfung ist als `deploy/preflight.sh` vorhanden und kontrolliert Projektdateien, Werkzeuge, Python-Version und optional die MongoDB-URI. Ein vollständig grafischer Installationsassistent ist weiterhin optional offen.
+
 ## Betrieb: Worker und Backups
 
 Nach der normalen Installation einmalig ausführen:
