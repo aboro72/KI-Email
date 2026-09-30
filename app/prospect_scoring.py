@@ -53,7 +53,7 @@ def score_products(text: str) -> list[dict[str, object]]:
     for profile in PRODUCT_PROFILES:
         matches = [item for item in profile.keywords if _contains(normalized, item)]
         bonus = [item for item in profile.bonus_keywords if _contains(normalized, item)]
-        score = min(100, len(matches) * 10 + len(bonus) * 8)
+        score = min(100, len(matches) * 15 + len(bonus) * 10)
         if score >= 70:
             priority = "sehr_gut"
         elif score >= 45:
