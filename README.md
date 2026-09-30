@@ -38,3 +38,10 @@ pytest -q
 ```
 
 Die technische Analyse steht in [docs/architecture.md](docs/architecture.md). Bedrock wird später über die modellagnostische Converse-API integriert; Modell-ID und Region bleiben konfigurierbar. CSV/TXT-Credentialimport folgt in Phase 4. Keine echten Zugangsdaten in `.env`, Git, Logs oder Tests eintragen.
+
+## Linux-Installation
+
+- [ISPConfig3-Installation](deploy/ispconfig3/installation.md) mit [Installationsskript](deploy/ispconfig3/install.sh)
+- [Einzelserver-Installation](deploy/single-server/installation.md) mit [Installationsskript](deploy/single-server/install.sh)
+
+Die Skripte kopieren keine lokale Datenbank und keine API-Key-Datei. Zugangsdaten werden erst auf dem Zielserver über eine geschützte Environment-Datei bzw. ein Secret-Management hinterlegt.
