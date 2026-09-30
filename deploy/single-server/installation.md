@@ -145,6 +145,16 @@ sudo journalctl -u aborodesk-update.service -f
 
 ## Produktionshinweise
 
+## Hintergrund-Worker und MongoDB-Backups
+
+Den Worker nach der Installation aktivieren:
+
+```bash
+sudo APP_DIR=/opt/aborodesk SERVICE_NAME=aborodesk SERVICE_USER=aborodesk SERVICE_GROUP=aborodesk bash /opt/aborodesk/deploy/install-worker.sh
+```
+
+Für tägliche Backups die MongoDB Database Tools installieren und `deploy/backup-mongodb.sh` per Cron oder systemd ausführen. Eine Wiederherstellung erfolgt kontrolliert mit `deploy/restore-mongodb.sh`; vorher immer den laufenden Dienst stoppen und ein aktuelles Backup anlegen.
+
 - MongoDB-Backups und ein getesteter Restore sind Pflicht.
 - Regelmäßige Backups und ein getesteter Restore sind Pflicht.
 - Bedrock-, Mail- und SMTP-Zugangsdaten getrennt vom Quellcode verwalten.

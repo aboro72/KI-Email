@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import Base, engine, get_db, initialize_persistence
-from app.models import Activity, AuditLog, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, OutgoingEmail, Permission, Role, Ticket, TicketComment, User, user_email_accounts
+from app.models import Activity, AuditLog, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
 
@@ -352,7 +352,73 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     can_crm = any(item.name == "CRM_MANAGE" for item in user.role.permissions)
     can_helpdesk = any(item.name == "HELPDESK_VIEW" for item in user.role.permissions)
     can_marketing = any(item.name == "MARKETING_VIEW" for item in user.role.permissions)
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk, "can_marketing": can_marketing, "update_status": _update_status()})
+    tasks = db.scalars(select(Task).where(Task.status == "open", (Task.assigned_to_user_id == user.id) | (Task.assigned_to_user_id.is_(None))).order_by(Task.due_at.is_(None), Task.due_at).limit(5)).all()
+    notifications = db.scalars(select(Notification).where(Notification.user_id == user.id, Notification.is_read.is_(False)).order_by(Notification.created_at.desc()).limit(5)).all()
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "tasks": tasks, "notifications": notifications, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk, "can_marketing": can_marketing, "update_status": _update_status()})
+
+
+@app.get("/tasks", response_class=HTMLResponse)
+def tasks_page(request: Request, db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    tasks = db.scalars(select(Task).where(Task.status == "open", (Task.assigned_to_user_id == user.id) | (Task.assigned_to_user_id.is_(None))).order_by(Task.due_at.is_(None), Task.due_at, Task.created_at.desc())).all()
+    return templates.TemplateResponse(request=request, name="tasks.html", context={"user": user, "tasks": tasks, "message": request.query_params.get("message")})
+
+
+@app.post("/tasks")
+def create_task(request: Request, title: str = Form(...), description: str = Form(""), priority: str = Form("normal"), due_at: str = Form(""), db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    parsed_due = None
+    if due_at:
+        try:
+            parsed_due = datetime.fromisoformat(due_at)
+        except ValueError:
+            return RedirectResponse("/tasks?message=Ungültiges+Fälligkeitsdatum", status_code=303)
+    task = Task(title=title.strip()[:240], description=description.strip(), priority=priority if priority in {"niedrig", "normal", "hoch"} else "normal", due_at=parsed_due, created_by_user_id=user.id)
+    db.add(task)
+    db.add(AuditLog(action="TASK_CREATED", actor_user_id=user.id, details=json.dumps({"title": task.title})))
+    db.commit()
+    return RedirectResponse("/tasks?message=Aufgabe+angelegt", status_code=303)
+
+
+@app.post("/tasks/{task_id}/complete")
+def complete_task(task_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    task = db.get(Task, task_id)
+    if not task or task.assigned_to_user_id not in {None, user.id}:
+        raise HTTPException(status_code=404, detail="Aufgabe nicht gefunden")
+    task.status = "completed"
+    task.completed_at = datetime.now(timezone.utc)
+    db.add(AuditLog(action="TASK_COMPLETED", actor_user_id=user.id, details=json.dumps({"task_id": task.id})))
+    db.commit()
+    return RedirectResponse("/tasks", status_code=303)
+
+
+@app.get("/notifications/{notification_id}/read")
+def read_notification(notification_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    notification = db.get(Notification, notification_id)
+    if notification and notification.user_id == user.id:
+        notification.is_read = True
+        db.commit()
+    return RedirectResponse(notification.url if notification and notification.url else "/dashboard", status_code=303)
+
+
+@app.get("/search", response_class=HTMLResponse)
+def global_search(request: Request, q: str = "", db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    query = q.strip()
+    results = []
+    if query:
+        term = f"%{query}%"
+        for item in db.scalars(select(Company).where(or_(Company.name.ilike(term), Company.domain.ilike(term), Company.industry.ilike(term))).limit(10)).all():
+            results.append({"kind": "Firma", "title": item.name, "detail": item.domain or item.industry, "url": f"/crm/companies/{item.id}"})
+        for item in db.scalars(select(Contact).where(or_(Contact.name.ilike(term), Contact.email.ilike(term))).limit(10)).all():
+            results.append({"kind": "Kontakt", "title": item.name, "detail": item.email, "url": "/crm/contacts"})
+        for item in db.scalars(select(Ticket).where(or_(Ticket.ticket_number.ilike(term), Ticket.subject.ilike(term), Ticket.requester_email.ilike(term))).limit(10)).all():
+            results.append({"kind": "Ticket", "title": f"{item.ticket_number} · {item.subject}", "detail": item.status, "url": f"/helpdesk/tickets/{item.id}"})
+        for item in db.scalars(select(EmailMessage).where(or_(EmailMessage.sender.ilike(term), EmailMessage.subject.ilike(term), EmailMessage.body_text.ilike(term))).limit(10)).all():
+            results.append({"kind": "E-Mail", "title": item.subject or "(ohne Betreff)", "detail": item.sender, "url": f"/inbox/{item.id}"})
+    return templates.TemplateResponse(request=request, name="search.html", context={"user": user, "query": query, "results": results})
 
 
 @app.get("/admin", response_class=HTMLResponse)

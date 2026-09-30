@@ -145,6 +145,16 @@ Alternativ kann der für die Laufzeit vorgesehene AWS-Bearer-Token über ein gee
 
 ## Wartung
 
+## Hintergrund-Worker und MongoDB-Backups
+
+Den Worker nach der Installation als root aktivieren:
+
+```bash
+sudo APP_DIR=/opt/aborodesk SERVICE_NAME=aborodesk SERVICE_USER=webXXX SERVICE_GROUP=clientY bash /opt/aborodesk/deploy/install-worker.sh
+```
+
+Für tägliche Backups die MongoDB Database Tools installieren und `deploy/backup-mongodb.sh` per Cron oder systemd ausführen. Eine Wiederherstellung erfolgt kontrolliert mit `deploy/restore-mongodb.sh`; vorher immer den laufenden Dienst stoppen und ein aktuelles Backup anlegen.
+
 ```bash
 sudo systemctl status aborodesk
 sudo journalctl -u aborodesk -f
