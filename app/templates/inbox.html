@@ -2,11 +2,11 @@
 <html lang="de">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Posteingang · KI-Email</title>
+  <title>Posteingang · AboroDesk Developer</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header><a class="brand" href="/">KI-Email</a><nav><a href="/dashboard">Dashboard</a><a href="/compose">Neue E-Mail</a>{% if user.role.name == 'admin' %}<a href="/admin">Administration</a>{% endif %}<form method="post" action="/logout"><button class="link-button">Abmelden</button></form></nav></header>
+<header><a class="brand" href="/">AboroDesk Developer</a><nav><a href="/dashboard">Dashboard</a><a href="/compose">Neue E-Mail</a>{% if user.role.name == 'admin' %}<a href="/admin">Administration</a>{% endif %}<form method="post" action="/logout"><button class="link-button">Abmelden</button></form></nav></header>
 <main class="shell">
   <div class="intro"><div><span class="eyebrow">Posteingang</span><h1>{% if account %}{{ account.email_address }}{% else %}Kein Konto{% endif %}</h1><p>Suche, filtere und öffne Nachrichten. Der Abruf startet nur auf deinen Klick.</p></div><div class="actions">{% if accounts|length > 1 %}<form method="get"><select name="account_id" onchange="this.form.submit()">{% for item in accounts %}<option value="{{ item.id }}"{% if account and item.id == account.id %} selected{% endif %}>{{ item.email_address }}</option>{% endfor %}</select></form>{% endif %}<a class="button" href="/inbox?account_id={{ account.id if account else '' }}&sync=1">Postfach aktualisieren</a></div></div>
   {% if imported %}<section class="notice"><strong>{{ imported }} neue Nachricht(en) importiert.</strong></section>{% endif %}
