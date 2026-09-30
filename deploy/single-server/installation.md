@@ -17,7 +17,7 @@ Das Skript installiert keinen Datenbankserver. Die Anwendung verwendet die konfi
 Repository übertragen oder klonen und in das Projektverzeichnis wechseln:
 
 ```bash
-git clone <REPOSITORY-URL> /opt/aborodesk-source
+git clone https://github.com/aboro72/KI-Email.git /opt/aborodesk-source
 cd /opt/aborodesk-source
 chmod +x deploy/single-server/install.sh
 ```
@@ -129,7 +129,7 @@ Nach der ersten Installation kann der systemd-Timer einen Git-Branch überwachen
 ```bash
 cd /opt/aborodesk
 chmod +x deploy/update.sh deploy/install-update-timer.sh
-sudo REPOSITORY_URL='https://github.com/OWNER/REPOSITORY.git' \
+sudo REPOSITORY_URL='https://github.com/aboro72/KI-Email.git' \
   GIT_BRANCH=master SERVICE_NAME=aborodesk APP_DIR=/opt/aborodesk APP_PORT=8000 \
   bash deploy/install-update-timer.sh
 ```

@@ -170,7 +170,7 @@ Nach der ersten Installation und dem Upload des neuen Projektstands:
 ```bash
 cd /web/app
 chmod +x deploy/update.sh deploy/install-update-timer.sh
-sudo REPOSITORY_URL='https://github.com/OWNER/REPOSITORY.git' \
+sudo REPOSITORY_URL='https://github.com/aboro72/KI-Email.git' \
   GIT_BRANCH=master SERVICE_NAME=aborodesk APP_DIR=/opt/aborodesk APP_PORT=8001 \
   bash deploy/install-update-timer.sh
 ```
