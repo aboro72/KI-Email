@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import base64
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, quote_plus, urlparse
 from urllib.request import Request, urlopen
@@ -48,6 +49,13 @@ def search(query: str, limit: int) -> list[str]:
         parser.feed(html)
         for href in parser.links:
             target = parse_qs(urlparse("https:" + href).query).get("uddg", [""])[0] if href.startswith("//duckduckgo.com/l/?") else href
+            if "bing.com/ck/a" in target:
+                encoded = parse_qs(urlparse(target).query).get("u", [""])[0]
+                if encoded.startswith("a1"):
+                    try:
+                        target = base64.urlsafe_b64decode(encoded[2:] + "===").decode("utf-8", errors="ignore")
+                    except Exception:
+                        target = ""
             parsed = urlparse(target)
             host = (parsed.hostname or "").lower().removeprefix("www.")
             if parsed.scheme not in {"http", "https"} or not host or any(host == blocked or host.endswith("." + blocked) for blocked in BLOCKED_HOSTS):
