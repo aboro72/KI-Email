@@ -230,6 +230,9 @@ class Company(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     research_status: Mapped[str] = mapped_column(String(30), default="pending")
     research_error: Mapped[str] = mapped_column(Text, default="")
+    product_fit_json: Mapped[str] = mapped_column(Text, default="[]")
+    best_product: Mapped[str] = mapped_column(String(40), default="", index=True)
+    best_product_score: Mapped[int] = mapped_column(default=0, index=True)
     contacts: Mapped[list["Contact"]] = relationship(back_populates="company", cascade="all, delete-orphan")
     leads: Mapped[list["Lead"]] = relationship(back_populates="company", cascade="all, delete-orphan")
 

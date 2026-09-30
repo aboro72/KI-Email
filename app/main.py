@@ -20,6 +20,7 @@ from app.db import Base, engine, get_db, initialize_persistence
 from app.jobs import enqueue
 from app.models import Activity, AuditLog, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
+from app.prospect_scoring import score_products
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -117,8 +118,14 @@ def research_company_background(company_id: int) -> None:
         company.researched_at = now
         company.research_status = "completed"
         company.research_error = ""
+        product_fit = score_products(f"{company.name} {company.industry} {page_text} {result['summary']} {result['sales_pitch']}")
+        company.product_fit_json = json.dumps(product_fit, ensure_ascii=False)
+        if product_fit:
+            company.best_product = str(product_fit[0]["product"])
+            company.best_product_score = int(product_fit[0]["score"])
         signals = "\n".join(f"- {item}" for item in result["relevant_signals"] if isinstance(item, str))
-        company.notes = f"Automatische KI-Recherche am {now.strftime('%d.%m.%Y %H:%M')} UTC.\n\n{result['summary']}\n\nBeobachtungen:\n{signals}\n\nGesprächshypothese:\n{result['sales_angle']}"
+        fit_text = "\n".join(f"- {item['label']}: {item['score']}/100 ({item['priority']}) – {', '.join(item['matches'][:6]) or 'keine eindeutigen Signale'}" for item in product_fit)
+        company.notes = f"Automatische KI-Recherche am {now.strftime('%d.%m.%Y %H:%M')} UTC.\n\n{result['summary']}\n\nProdukt-Fit:\n{fit_text}\n\nBeobachtungen:\n{signals}\n\nGesprächshypothese:\n{result['sales_angle']}"
         db.flush()
         for item in result["public_contacts"]:
             if not isinstance(item, dict):
@@ -188,7 +195,7 @@ async def lifespan(_: FastAPI):
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE leads ADD COLUMN sales_pitch TEXT NOT NULL DEFAULT ''"))
         company_columns = {column["name"] for column in inspect(engine).get_columns("companies")}
-        for name, definition in {"researched_at": "DATETIME", "research_status": "VARCHAR(30) NOT NULL DEFAULT 'pending'", "research_error": "TEXT NOT NULL DEFAULT ''"}.items():
+        for name, definition in {"researched_at": "DATETIME", "research_status": "VARCHAR(30) NOT NULL DEFAULT 'pending'", "research_error": "TEXT NOT NULL DEFAULT ''", "product_fit_json": "TEXT NOT NULL DEFAULT '[]'", "best_product": "VARCHAR(40) NOT NULL DEFAULT ''", "best_product_score": "INTEGER NOT NULL DEFAULT 0"}.items():
             if name not in company_columns:
                 with engine.begin() as connection:
                     connection.execute(text(f"ALTER TABLE companies ADD COLUMN {name} {definition}"))
