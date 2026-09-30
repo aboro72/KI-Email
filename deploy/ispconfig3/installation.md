@@ -160,3 +160,29 @@ sudo systemctl restart aborodesk
 ```
 
 Vor Updates immer ein Datenbank- und Konfigurationsbackup erstellen.
+
+## Automatische Updates alle 20 Minuten
+
+Der automatische Updater verwendet GitHub als Quelle. Der FTP-Ordner `/web/app` bleibt der initiale Installationsort; spätere Updates werden kontrolliert aus dem Git-Repository nach `/opt/aborodesk` übernommen. Dafür muss der Server SSH-/HTTPS-Zugriff auf das Repository haben.
+
+Nach der ersten Installation und dem Upload des neuen Projektstands:
+
+```bash
+cd /web/app
+chmod +x deploy/update.sh deploy/install-update-timer.sh
+sudo REPOSITORY_URL='https://github.com/OWNER/REPOSITORY.git' \
+  GIT_BRANCH=master SERVICE_NAME=aborodesk APP_DIR=/opt/aborodesk APP_PORT=8001 \
+  bash deploy/install-update-timer.sh
+```
+
+Für ein privates Repository sollte statt eines Tokens in der URL ein SSH-Deploy-Key oder ein bereits eingerichteter Git-Credential-Helper verwendet werden. Zugangsdaten niemals in die URL, in Git-Dateien oder Logs schreiben.
+
+Der Timer prüft alle 20 Minuten und aktualisiert nur bei einem neuen Commit. Vorher wird der aktuelle Anwendungscode unter `/var/backups/aborodesk/` gesichert. Nach dem Neustart wird `/health` geprüft; bei Fehlern erfolgt ein Code-Rollback. MongoDB wird nicht überschrieben, da sie außerhalb des Anwendungscodes liegt.
+
+Kontrolle:
+
+```bash
+sudo systemctl list-timers aborodesk-update.timer
+sudo journalctl -u aborodesk-update.service -f
+sudo systemctl start aborodesk-update.service
+```

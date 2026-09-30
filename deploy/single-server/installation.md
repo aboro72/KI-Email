@@ -122,6 +122,25 @@ sudo systemctl restart aborodesk
 
 Bei Änderungen am Schema den Startvorgang und die Logs kontrollieren. Für produktive Backups die MongoDB-Datenbank `aborodesk` und `/etc/aborodesk/aborodesk.env` getrennt und verschlüsselt sichern.
 
+## Automatische Updates alle 20 Minuten
+
+Nach der ersten Installation kann der systemd-Timer einen Git-Branch überwachen:
+
+```bash
+cd /opt/aborodesk
+chmod +x deploy/update.sh deploy/install-update-timer.sh
+sudo REPOSITORY_URL='https://github.com/OWNER/REPOSITORY.git' \
+  GIT_BRANCH=master SERVICE_NAME=aborodesk APP_DIR=/opt/aborodesk APP_PORT=8000 \
+  bash deploy/install-update-timer.sh
+```
+
+Bei privaten Repositories einen SSH-Deploy-Key oder einen eingerichteten Git-Credential-Helper verwenden. Der Timer prüft alle 20 Minuten, installiert neue Python-Abhängigkeiten, startet den Dienst neu und prüft `/health`. Bei einem Fehler wird der vorherige Quellstand wiederhergestellt.
+
+```bash
+sudo systemctl list-timers aborodesk-update.timer
+sudo journalctl -u aborodesk-update.service -f
+```
+
 ## Produktionshinweise
 
 - MongoDB-Backups und ein getesteter Restore sind Pflicht.

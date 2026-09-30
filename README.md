@@ -49,3 +49,5 @@ Die Skripte kopieren keine lokale Datenbank und keine API-Key-Datei. Zugangsdate
 ## MongoDB-Migration
 
 Die Anwendung kann mit einer MongoDB-URI betrieben werden. Für die einmalige Übernahme des bestehenden SQLite-Bestands steht [migrate_sqlite_to_mongo.py](scripts/migrate_sqlite_to_mongo.py) bereit. Die SQLite-Datei wird dabei nur gelesen und bleibt als Backup erhalten.
+
+Der optionale [automatische Update-Dienst](deploy/update.sh) prüft per systemd-Timer alle 20 Minuten einen Git-Branch und rollt bei einem fehlgeschlagenen Healthcheck automatisch auf den vorherigen Anwendungscode zurück.
