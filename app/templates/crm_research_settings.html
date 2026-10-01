@@ -1,0 +1,15 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Firmenrecherche · AboroDesk</title><link rel="stylesheet" href="/static/style.css"></head><body>
+<header><a class="brand" href="/">AboroDesk</a><nav><a href="/crm">CRM</a><a href="/crm/companies">Firmen</a><a href="/help">Hilfe</a></nav></header>
+<main class="shell"><h1>Suchkriterien für Firmen</h1><p>Deutschland bleibt fest eingestellt. Auch kleine Unternehmen sind willkommen; Firmengröße ist kein Ausschlussgrund. Änderungen gelten beim nächsten automatischen Suchlauf.</p>
+{% if message %}<p role="status">{{ message }}</p>{% endif %}
+<form method="post" class="panel"><h2>Welche Firmen passen zu welchem Angebot?</h2><p>Eine Suchanfrage pro Zeile, maximal zehn pro Produkt. Ein leerer Bereich deaktiviert die Suche für dieses Produkt.</p>
+{% for key, label in [('aborodesk','AboroDesk – CRM, E-Mail und Aufgaben'),('aborolms','AboroLMS – Lernen und Weiterbildung'),('cloudshare','CloudShare – Dokumente teilen'),('helpdesk','Helpdesk – Serviceanfragen')] %}
+<label>{{ label }}<textarea name="{{ key }}" rows="4" maxlength="10000">{{ criteria.queries[key]|join('\n') }}</textarea></label>{% endfor %}
+<label>Ausgeschlossene Domains (ohne https://)<textarea name="excluded_domains" rows="5">{{ criteria.excluded_domains|join('\n') }}</textarea></label>
+<label>Ausschlussformulierungen für Softwareanbieter<textarea name="excluded_phrases" rows="5">{{ criteria.excluded_phrases|join('\n') }}</textarea></label>
+<p>Ein Microsoft-Partner oder ein Betrieb, der Software nur nutzt, wird nicht allein deshalb ausgeschlossen. Herstellerhinweise sind ein konservativer Filter; Grenzfälle bitte manuell prüfen.</p>
+<label>Mindest-Produktpassung (20–100)<input type="number" name="min_score" min="20" max="100" value="{{ criteria.min_score }}" required></label>
+<label>Treffer pro Suchanfrage (1–10)<input type="number" name="per_query" min="1" max="10" value="{{ criteria.per_query }}" required></label><button class="button">Suchkriterien speichern</button></form>
+<section class="panel"><h2>Handelsregister: gezielte Einzelprüfung</h2><p>Suche eine konkrete Firma im offiziellen Register und gleiche Name, Sitz und Registernummer ab. Nicht alle Kleinunternehmen sind dort eingetragen. Registerangaben sind kein Nachweis für Kaufinteresse.</p>
+<a class="button secondary" href="https://www.handelsregister.de/" target="_blank" rel="noopener noreferrer">Handelsregister öffnen</a> <a href="https://www.unternehmensregister.de/de" target="_blank" rel="noopener noreferrer">Unternehmensregister</a>
+<p>Kein automatischer Register-Massenimport: Die Nutzungsordnung untersagt systematische Abrufe zum Aufbau eigener Voll- oder Teilregister. Einzelne Angaben kannst du mit Quellenlink als CRM-Aktivität dokumentieren.</p></section></main></body></html>

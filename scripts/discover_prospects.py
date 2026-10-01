@@ -7,6 +7,7 @@ import re
 import sys
 import base64
 from html.parser import HTMLParser
+from html import unescape
 from urllib.parse import parse_qs, quote_plus, urlparse
 from urllib.request import Request, urlopen
 
@@ -18,13 +19,9 @@ from app.db import Base, SessionLocal, engine, initialize_persistence
 from app.jobs import enqueue
 from app.models import Company
 from app.prospect_scoring import score_products
+from app.prospect_criteria import DEFAULTS, load_criteria, exclusion_reason, germany_evidence, website_evidence
 
-DEFAULT_QUERIES = {
-    "aborodesk": ["KMU Kundenservice CRM Automatisierung Deutschland", "Dienstleister Kundenkommunikation Support Team Deutschland"],
-    "aborolms": ["Weiterbildungsanbieter Online Kurse Prüfungen Zertifikate Deutschland", "Akademie E-Learning Schulungen Unternehmen Deutschland"],
-    "cloudshare": ["Unternehmen sicherer Dokumentenaustausch Kunden Partner Deutschland", "Ingenieurbüro Kundenportal Dateifreigabe Deutschland"],
-    "helpdesk": ["IT Dienstleister Ticketsystem SLA Support Deutschland", "Softwarehaus Kundensupport Helpdesk Serviceverträge Deutschland"],
-}
+DEFAULT_QUERIES = DEFAULTS["queries"]
 BLOCKED_HOSTS = {
     "google.com", "google.de", "googleusercontent.com", "bing.com", "duckduckgo.com",
     "facebook.com", "instagram.com", "linkedin.com", "youtube.com", "wikipedia.org",
@@ -32,6 +29,9 @@ BLOCKED_HOSTS = {
     "gelbeseiten.de", "yelp.de", "tripadvisor.de", "kununu.com", "xing.com",
     "indeed.com", "stepstone.de", "northdata.de", "firmenwissen.de", "werliefertwas.de",
     "wlw.de", "meinestadt.de", "news.bbc.co.uk", "bbc.com", "bbc.co.uk",
+    "tiktok.com", "dailymotion.com", "soundcloud.com", "pinterest.com", "zhihu.com",
+    "kleinanzeigen.de", "duden.de", "reddit.com", "firmania.de",
+    "defirmenkataloge.com",
 }
 MAX_PAGE_BYTES = 300_000
 MIN_PRODUCT_SCORE = 20
@@ -41,23 +41,53 @@ class LinkParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.links: list[str] = []
+        self.in_heading = False
+        self.entries = []
+        self.active_href = ""
+        self.active_text = ""
 
     def handle_starttag(self, tag, attrs):
+        if tag.lower() == "h2":
+            self.in_heading = True
         if tag.lower() == "a":
-            href = dict(attrs).get("href", "")
-            if href:
+            attributes = dict(attrs)
+            href = attributes.get("href", "")
+            if href and (self.in_heading or "result__a" in attributes.get("class", "").split()):
                 self.links.append(href)
+                self.active_href = href
+                self.active_text = ""
+
+    def handle_endtag(self, tag):
+        if tag.lower() == "a" and self.active_href:
+            self.entries.append((self.active_href, self.active_text))
+            self.active_href = ""
+        if tag.lower() == "h2":
+            self.in_heading = False
+
+    def handle_data(self, data):
+        if self.active_href:
+            self.active_text += data + " "
+
+
+def relevant_result(query, title, url):
+    words = re.findall(r"[a-zäöüß]+", query.lower().split(" -")[0])
+    stems = [word[:7] for word in words if len(word) >= 5 and word not in {"deutschland", "kleine", "kleines", "unternehmen", "online"}]
+    evidence = unescape(title + " " + url).lower()
+    return bool(stems) and any(stem in evidence for stem in stems)
 
 
 def search(query: str, limit: int) -> list[str]:
     results = []
-    for search_url in ("https://html.duckduckgo.com/html/?q=" + quote_plus(query), "https://www.bing.com/search?q=" + quote_plus(query)):
+    for search_url in ("https://html.duckduckgo.com/html/?kl=de-de&q=" + quote_plus(query), "https://www.bing.com/search?cc=de&mkt=de-DE&q=" + quote_plus(query)):
         request = Request(search_url, headers={"User-Agent": "Mozilla/5.0 AboroDesk-ProspectResearch/1.0"})
-        with urlopen(request, timeout=20) as response:
-            html = response.read(1_500_000).decode("utf-8", errors="ignore")
+        try:
+            with urlopen(request, timeout=20) as response:
+                html = response.read(1_500_000).decode("utf-8", errors="ignore")
+        except Exception:
+            continue
         parser = LinkParser()
         parser.feed(html)
-        for href in parser.links:
+        for href, title in parser.entries:
             target = parse_qs(urlparse("https:" + href).query).get("uddg", [""])[0] if href.startswith("//duckduckgo.com/l/?") else href
             if "bing.com/ck/a" in target:
                 encoded = parse_qs(urlparse(target).query).get("u", [""])[0]
@@ -69,6 +99,8 @@ def search(query: str, limit: int) -> list[str]:
             parsed = urlparse(target)
             host = (parsed.hostname or "").lower().removeprefix("www.")
             if parsed.scheme not in {"http", "https"} or not host or any(host == blocked or host.endswith("." + blocked) for blocked in BLOCKED_HOSTS):
+                continue
+            if not relevant_result(query, title, target):
                 continue
             normalized = f"https://{host}/"
             if normalized not in results:
@@ -91,27 +123,40 @@ def visible_text(html: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def page_product_fit(url: str) -> tuple[int, list[str]]:
+def page_product_fit(url: str, config=None) -> tuple[int, list[str]]:
     """Prüft die Startseite vor dem CRM-Eintrag gegen die Produktkriterien."""
-    request = Request(url, headers={"User-Agent": "Mozilla/5.0 AboroDesk-ProspectResearch/1.0"})
-    with urlopen(request, timeout=10) as response:
-        html = response.read(MAX_PAGE_BYTES).decode("utf-8", errors="ignore")
-    fits = score_products(visible_text(html))
+    config = config or DEFAULTS
+    reason = exclusion_reason(url, "", config)
+    if reason:
+        raise ValueError(reason)
+    text, legal_text, final_url = website_evidence(url)
+    reason = exclusion_reason(final_url, text, config)
+    if reason:
+        raise ValueError(reason)
+    if not germany_evidence(legal_text or text):
+        raise ValueError("Deutscher Firmensitz nicht belegt")
+    reason = exclusion_reason(final_url, text + " " + legal_text, config)
+    if reason:
+        raise ValueError(reason)
+    fits = score_products(text)
     best = int(fits[0]["score"]) if fits else 0
-    labels = [str(item["label"]) for item in fits if int(item["score"]) >= MIN_PRODUCT_SCORE]
+    labels = [str(item["label"]) for item in fits if int(item["score"]) >= config["min_score"]]
     return best, labels
 
 
 def main() -> int:
     Base.metadata.create_all(engine)
     initialize_persistence()
-    max_per_query = max(1, int(os.getenv("PROSPECTS_PER_QUERY", "5")))
+    with SessionLocal() as settings_db:
+        config = load_criteria(settings_db)
+    max_per_query = config["per_query"]
     dry_run = os.getenv("PROSPECT_DISCOVERY_DRY_RUN", "0") == "1"
     candidates: list[tuple[str, str]] = []
-    for product, queries in DEFAULT_QUERIES.items():
+    for product, queries in config["queries"].items():
         for query in queries:
             try:
-                urls = search(query, max_per_query)
+                market_query = query if "deutschland" in query.lower() else query + " Deutschland"
+                urls = search(market_query + " -Softwarehersteller -Microsoft -SAP", max_per_query)
                 print(f"{product}: {query} -> {len(urls)} Treffer")
                 candidates.extend((product, url) for url in urls)
             except Exception as exc:
@@ -125,18 +170,18 @@ def main() -> int:
             if domain in seen or domain in known_domains or domain == "aborosoft.com":
                 continue
             try:
-                best_score, matching_products = page_product_fit(url)
+                best_score, matching_products = page_product_fit(url, config)
             except Exception as exc:
-                print(f"SKIP {domain}: Website nicht prüfbar ({type(exc).__name__})")
+                print(f"SKIP {domain}: {str(exc) if isinstance(exc, ValueError) else type(exc).__name__}")
                 continue
-            if best_score < MIN_PRODUCT_SCORE:
+            if best_score < config["min_score"]:
                 print(f"SKIP {domain}: kein ausreichender Produkt-Fit")
                 continue
             seen.add(domain)
             if dry_run:
                 print(f"DRY-RUN {name} {url}")
                 continue
-            company = Company(name=name, domain=domain, website=url, source_url="Automatische Websuche", research_status="pending", notes=f"Automatisch als Recherche-Kandidat gefunden ({', '.join(matching_products)}); vor Kontaktaufnahme prüfen.")
+            company = Company(name=name, domain=domain, website=url, source_url=url, research_status="pending", notes=f"Automatische Websuche; deutscher Firmensitz im Impressum geprüft. Passende Angebote: {', '.join(matching_products)}. Vor Kontaktaufnahme und Registerabgleich prüfen.")
             db.add(company)
             db.flush()
             enqueue(db, "crm.company_research", {"company_id": company.id})

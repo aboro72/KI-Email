@@ -52,6 +52,13 @@ class User(Base):
     email_accounts: Mapped[list["EmailAccount"]] = relationship(secondary=user_email_accounts, back_populates="users")
 
 
+class ProspectSearchSettings(Base):
+    __tablename__ = "prospect_search_settings"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    settings_json: Mapped[str] = mapped_column(Text, default="{}")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -19,7 +19,7 @@ PRODUCT_PROFILES = (
         "aborodesk",
         "AboroDesk",
         ("crm", "kundenservice", "kundenkommunikation", "aufgaben", "automatisierung", "e-mail", "email", "vertrieb"),
-        ("kundenportal", "wiedervorlage", "workflow", "mehrere standorte", "serviceprozess"),
+        ("kundenportal", "wiedervorlage", "workflow", "mehrere standorte", "serviceprozess", "handwerksbetrieb", "hausverwaltung", "kundenanfragen", "angebotserstellung", "terminvereinbarung"),
     ),
     ProductProfile(
         "aborolms",
@@ -31,15 +31,19 @@ PRODUCT_PROFILES = (
         "cloudshare",
         "CloudShare",
         ("dateiaustausch", "dokumentenaustausch", "dateifreigabe", "cloud", "kundenportal", "partnerportal", "große dateien"),
-        ("zugriffsrechte", "sensible dokumente", "externe partner", "mehrere standorte", "versionschaos", "sicher teilen", "sicherem dokumentenaustausch"),
+        ("zugriffsrechte", "sensible dokumente", "externe partner", "mehrere standorte", "versionschaos", "sicher teilen", "sicherem dokumentenaustausch", "ingenieurbüro", "architekturbüro", "baupläne", "planungsbüro"),
     ),
     ProductProfile(
         "helpdesk",
         "HelpDesk",
         ("helpdesk", "ticketsystem", "ticket", "it-support", "kundensupport", "support-team", "kundenservice", "serviceanfragen"),
-        ("sla", "eskalation", "eskalationen", "reaktionszeit", "lösungszeit", "serviceverträge", "technische hotline", "wissensdatenbank"),
+        ("sla", "eskalation", "eskalationen", "reaktionszeit", "lösungszeit", "serviceverträge", "technische hotline", "wissensdatenbank", "systemhaus", "kundendienst", "wartungsvertrag"),
     ),
 )
+
+# Ein belegter Betriebstyp reicht für die niedrigste Prüfpriorität, nicht für
+# bestätigten Bedarf. Kleine Büros nennen selten technische Produktbegriffe.
+SMALL_BUSINESS_SIGNALS = {"handwerksbetrieb", "hausverwaltung", "ingenieurbüro", "architekturbüro", "planungsbüro", "systemhaus", "kundendienst"}
 
 
 def _contains(text: str, phrase: str) -> bool:
@@ -53,7 +57,7 @@ def score_products(text: str) -> list[dict[str, object]]:
     for profile in PRODUCT_PROFILES:
         matches = [item for item in profile.keywords if _contains(normalized, item)]
         bonus = [item for item in profile.bonus_keywords if _contains(normalized, item)]
-        score = min(100, len(matches) * 15 + len(bonus) * 10)
+        score = min(100, len(matches) * 15 + sum(20 if item in SMALL_BUSINESS_SIGNALS else 10 for item in bonus))
         if score >= 70:
             priority = "sehr_gut"
         elif score >= 45:
