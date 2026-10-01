@@ -19,6 +19,7 @@
 - Vorversion der geänderten Bestandsdateien: `/opt/aborodesk/deploy/rollback-prospects-20261001/`. Neue Dateien bei einem Rollback separat beachten.
 - Live-Suchprobe ohne CRM-Schreibvorgänge: Suchmaschinen lieferten teilweise sachfremde Treffer. Deshalb zusätzlicher Titel-/Domain-Relevanzfilter. Suchqualität ist weiterhin abhängig von öffentlichen Suchmaschinen; keine Erfolgsgarantie pro Lauf.
 - Der anschließende Prüflauf fand reale Ingenieurbüros und bestätigte die Standortprüfung. Ein bloßer Betriebstyp wird inzwischen mit 20 Punkten nur als Kandidat zur manuellen Prüfung gewertet, damit Kleinbetriebe ohne technische Website-Begriffe nicht pauschal herausfallen.
+- Abschließender Live-Test: `projekt55.de` erfüllte die Standortprüfung und erhielt CloudShare mit 20 Punkten (beobachten). Acht neue Tests auf dem Server erfolgreich; Anwendung, Worker und Suchtimer aktiv.
 - Bestehende Firmen und alte Leads bleiben erhalten. Keine pauschale Bereinigung und kein automatischer Versand.
 
 ## Grenzen / nächster Schritt
@@ -27,6 +28,6 @@
 2. Die Standort- und Wettbewerbsfilter sind Heuristiken: unklare Firmen werden konservativ übersprungen; Mischanbieter können fälschlich ausgeschlossen werden. Keine amtliche Verifikation oder KI-bestätigte Kaufabsicht behaupten.
 3. Handelsregister: noch offen sind der freigegebene Import einzelner Auszüge und strukturierte Register-/Adressfelder. Automatischer Register-Massenimport wurde bewusst nicht gebaut: [Portal-Nutzungsordnung](https://www.handelsregister.de/rp_web/information/welcome.xhtml), Punkt 3.
 4. Optional lizenzierte Such-/Firmendatenquelle, genauere Branchengewichtung, Auswertungsansicht für übersprungene Kandidaten, Ausschluss einzelner Produkte bei Mischanbietern und kleinere produktbezogene Kampagnen.
-5. GitHub-Synchronisierung war zuletzt wegen fehlender Schreibberechtigung des angemeldeten Kontos blockiert. Änderungen lokal sichern; nicht ohne bestätigten Push als auf GitHub verfügbar behandeln.
+5. GitHub-Push am 01.10.2026 erneut mit HTTP 403 abgelehnt: Konto `ML-PIT` hat keine Schreibberechtigung für `aboro72/KI-Email`. Implementierung lokal in Commit `d4b2a63` gesichert und unabhängig davon auf den Server übertragen. GitHub enthält diese Änderungen noch nicht. Zum Weiterarbeiten zu Hause liegt zusätzlich eine Git-Sicherung `KI-Email-2026-10-01.bundle` im SSH-Benutzerverzeichnis auf dem Server (vollständiger master-Verlauf, einschließlich Übergabe).
 
 Details und Bedienung: [Produkt-Recherche-Kriterien](produkt-recherche-kriterien.md). Keine Passwörter oder API-Schlüssel in dieser Übergabe.
