@@ -1,0 +1,366 @@
+diff --git a/api/views.py b/api/views.py
+index ff264b7..233402a 100644
+--- a/api/views.py
++++ b/api/views.py
+@@ -15,6 +15,10 @@ from django.db.models import Q, Count, Sum
+ from django.http import FileResponse
+ from django.utils import timezone
+ from django.core.exceptions import PermissionDenied
++from django.contrib.contenttypes.models import ContentType
++from django.urls import reverse
++from django.conf import settings
++from urllib.parse import quote
+ 
+ from core.models import StorageFile, StorageFolder, FileVersion, ActivityLog, Notification
+ from accounts.models import UserProfile
+@@ -40,6 +44,17 @@ import logging
+ logger = logging.getLogger(__name__)
+ 
+ 
++def accessible_files(user):
++    """Generic shares have no reverse 'usershare' relation on StorageFile."""
++    shares = UserShare.objects.filter(
++        shared_with=user, is_active=True,
++        content_type=ContentType.objects.get_for_model(StorageFile),
++    ).values_list('object_id', flat=True)
++    return StorageFile.objects.filter(
++        Q(owner=user) | Q(pk__in=shares), is_trashed=False,
++    ).distinct()
++
++
+ class StandardResultsSetPagination(PageNumberPagination):
+     """Custom pagination for API"""
+     page_size = 25
+@@ -53,7 +68,7 @@ class StorageFileViewSet(viewsets.ModelViewSet):
+     Supports CRUD operations with permissions.
+     """
+     serializer_class = StorageFileSerializer
+-    permission_classes = [IsAuthenticated]
++    permission_classes = [IsAuthenticated, IsFileOwnerOrShared]
+     parser_classes = (MultiPartParser, FormParser)
+     pagination_class = StandardResultsSetPagination
+     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+@@ -64,9 +79,7 @@ class StorageFileViewSet(viewsets.ModelViewSet):
+     def get_queryset(self):
+         """Get files for current user"""
+         user = self.request.user
+-        return StorageFile.objects.filter(
+-            Q(owner=user) | Q(usershare__shared_with=user)
+-        ).distinct()
++        return accessible_files(user)
+ 
+     def get_serializer_class(self):
+         """Use detailed serializer for retrieve"""
+@@ -182,6 +195,32 @@ class StorageFileViewSet(viewsets.ModelViewSet):
+             ip = self.request.META.get('REMOTE_ADDR')
+         return ip
+ 
++    @action(detail=True, methods=['post'], url_path='office')
++    def office(self, request, pk=None):
++        """Issue a short-lived editor URL without a browser login session."""
++        from storage.views import supports_collabora, build_collabora_token
++        file_obj = self.get_object()
++        if file_obj.owner_id != request.user.id:
++            raise PermissionDenied('Only the owner may start an Office session via this API')
++        if not supports_collabora(file_obj):
++            return Response({'detail': 'File type is not supported by Collabora'}, status=400)
++        token = build_collabora_token(request.user, file_obj)
++        wopi_src = settings.CLOUDSERVICE_EXTERNAL_URL.rstrip('/') + reverse(
++            'storage:wopi_file', kwargs={'file_id': file_obj.id},
++        )
++        editor_url = (
++            settings.COLLABORA_BASE_URL.rstrip('/') + '/browser/dist/cool.html'
++            + '?WOPISrc=' + quote(wopi_src, safe='')
++            + '&access_token=' + quote(token, safe='') + '&lang=de'
++        )
++        response = Response({
++            'editor_url': editor_url,
++            'expires_in': settings.COLLABORA_ACCESS_TOKEN_TTL,
++        })
++        response['Cache-Control'] = 'no-store'
++        response['Referrer-Policy'] = 'no-referrer'
++        return response
++
+ 
+ class StorageFolderViewSet(viewsets.ModelViewSet):
+     """ViewSet for folder operations"""
+@@ -212,7 +251,7 @@ class StorageFolderViewSet(viewsets.ModelViewSet):
+         folder = self.get_object()
+ 
+         subfolders = folder.subfolders.all()
+-        files = folder.files.all()
++        files = folder.files.filter(is_trashed=False)
+ 
+         folder_serializer = StorageFolderSerializer(subfolders, many=True)
+         file_serializer = StorageFileSerializer(files, many=True)
+@@ -232,6 +271,7 @@ class FileVersionsView(generics.ListAPIView):
+     def get_queryset(self):
+         """Get versions for specific file"""
+         file_id = self.kwargs.get('file_id')
++        get_object_or_404(accessible_files(self.request.user), id=file_id)
+         return FileVersion.objects.filter(file_id=file_id).order_by('-version_number')
+ 
+ 
+@@ -241,31 +281,39 @@ class RestoreFileVersionView(generics.GenericAPIView):
+ 
+     def post(self, request, file_id):
+         """Restore file version"""
+-        file_obj = get_object_or_404(StorageFile, id=file_id, owner=request.user)
++        file_obj = get_object_or_404(StorageFile, id=file_id, owner=request.user, is_trashed=False)
+         version_id = request.data.get('version_id')
+ 
+         version = get_object_or_404(FileVersion, id=version_id, file=file_obj)
+ 
+-        # Create new version with restored content
+-        new_version_number = file_obj.version_count + 1
+-
+-        FileVersion.objects.create(
+-            file=file_obj,
+-            version_number=new_version_number,
+-            file_data=version.file_data,
+-            file_hash=version.file_hash,
+-            size=version.size,
+-            change_description=f"Restored from version {version.version_number}",
+-            is_current=True
+-        )
+-
+-        # Update current file
+-        file_obj.version_count = new_version_number
+-        file_obj.save()
++        from storage.views import save_file_revision, get_wopi_lock_key, ensure_quota_available
++        from django.core.cache import cache
++        from django.conf import settings
++        # Do not race an active Office editing session.
++        if cache.get(get_wopi_lock_key(file_id)):
++            return Response({'detail': 'Close the Office editor before restoring a version'}, status=409)
++        with version.file_data.open('rb') as source:
++            content = source.read(getattr(settings, 'MAX_UPLOAD_SIZE_BYTES', 500*1024*1024) + 1)
++        if len(content) > getattr(settings, 'MAX_UPLOAD_SIZE_BYTES', 500*1024*1024):
++            return Response({'detail': 'Stored version exceeds the upload size limit'}, status=413)
++        try:
++            ensure_quota_available(request.user, len(content))
++        except ValueError as exc:
++            return Response({'detail': str(exc)}, status=413)
++        expected = request.data.get('expected_version_count')
++        if expected is not None:
++            try:
++                expected = int(expected)
++            except (ValueError, TypeError):
++                return Response({'detail': 'Invalid expected version count'}, status=400)
++        try:
++            file_obj = save_file_revision(file_obj, content, f'Restored from version {version.version_number}', expected_count=expected)
++        except ValueError:
++            return Response({'detail': 'Document changed; reload its version history'}, status=409)
+ 
+         return Response({
+             'message': 'File restored successfully',
+-            'version_number': new_version_number
++            'version_number': file_obj.versions.order_by('-version_number').first().version_number
+         })
+ 
+ 
+diff --git a/api/serializers.py b/api/serializers.py
+index 2950a05..5e0e716 100644
+--- a/api/serializers.py
++++ b/api/serializers.py
+@@ -64,6 +64,18 @@ class StorageFolderSerializer(serializers.ModelSerializer):
+     file_count = serializers.SerializerMethodField()
+     size = serializers.SerializerMethodField()
+ 
++    def validate_parent(self, value):
++        if value and value.owner_id != self.context['request'].user.id:
++            raise serializers.ValidationError('Parent folder is not owned by you')
++        current = value
++        seen = set()
++        while current:
++            if current.pk in seen or (self.instance and current.pk == self.instance.pk):
++                raise serializers.ValidationError('Folder hierarchy cannot contain a cycle')
++            seen.add(current.pk)
++            current = current.parent
++        return value
++
+     class Meta:
+         model = StorageFolder
+         fields = [
+@@ -103,6 +115,24 @@ class StorageFileSerializer(serializers.ModelSerializer):
+     extension = serializers.SerializerMethodField()
+     size_mb = serializers.SerializerMethodField()
+ 
++    def validate_folder(self, value):
++        if value.owner_id != self.context['request'].user.id:
++            raise serializers.ValidationError('Folder is not owned by you')
++        return value
++
++    def validate_file(self, value):
++        from storage.views import validate_upload, ensure_quota_available
++        if self.instance:
++            raise serializers.ValidationError('Replace contents using the Office editor')
++        valid, message = validate_upload(value)
++        if not valid:
++            raise serializers.ValidationError(message)
++        try:
++            ensure_quota_available(self.context['request'].user, value.size)
++        except ValueError as exc:
++            raise serializers.ValidationError(str(exc)) from None
++        return value
++
+     class Meta:
+         model = StorageFile
+         fields = [
+diff --git a/api/permissions.py b/api/permissions.py
+index 15693f3..54eb80e 100644
+--- a/api/permissions.py
++++ b/api/permissions.py
+@@ -21,6 +21,8 @@ class IsFileOwnerOrShared(BasePermission):
+         share = UserShare.objects.filter(
+             shared_with=request.user,
+             object_id=obj.id,
++            content_type__app_label='core',
++            content_type__model='storagefile',
+             is_active=True
+         ).first()
+ 
+@@ -28,6 +30,8 @@ class IsFileOwnerOrShared(BasePermission):
+             return False
+ 
+         # Check permission level
++        if request.method == 'DELETE':
++            return share.can_delete()
+         if request.method in SAFE_METHODS:
+             return share.can_view()
+         else:
+diff --git a/core/models.py b/core/models.py
+index dfe43da..c368766 100644
+--- a/core/models.py
++++ b/core/models.py
+@@ -126,7 +126,7 @@ class StorageFolder(TimeStampedModel):
+     def get_size(self):
+         """Calculate total size of folder and contents (MB)"""
+         files_size = self.files.aggregate(
+-            total_size=Sum('file__size')
++            total_size=Sum('size')
+         )['total_size'] or 0
+ 
+         # Recursively get subfolders sizes
+diff --git a/storage/views.py b/storage/views.py
+index 80b4f0b..b49b1cb 100644
+--- a/storage/views.py
++++ b/storage/views.py
+@@ -9,7 +9,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
+ from django.shortcuts import redirect, get_object_or_404
+ from django.urls import reverse, reverse_lazy
+ from django.http import FileResponse, JsonResponse, Http404, HttpResponse
+-from django.db.models import Q, Sum
++from django.db.models import Q, Sum, Max
++from django.db import transaction
++from django.core.exceptions import PermissionDenied
+ from django.core.files.base import ContentFile, File
+ from django.conf import settings
+ from django.core import signing
+@@ -19,7 +21,7 @@ from django.utils.decorators import method_decorator
+ from django.views.decorators.csrf import csrf_exempt
+ from django.views.decorators.cache import never_cache
+ 
+-from core.models import StorageFile, StorageFolder
++from core.models import StorageFile, StorageFolder, FileVersion
+ import io
+ import logging
+ import mimetypes
+@@ -508,16 +510,45 @@ def build_collabora_token(user, file_obj):
+ 
+ 
+ def parse_collabora_token(token, file_id):
+-    payload = signing.loads(
+-        token,
+-        salt='collabora-wopi',
+-        max_age=settings.COLLABORA_ACCESS_TOKEN_TTL,
+-    )
++    try:
++        payload = signing.loads(
++            token,
++            salt='collabora-wopi',
++            max_age=settings.COLLABORA_ACCESS_TOKEN_TTL,
++        )
++    except (signing.BadSignature, ValueError, TypeError):
++        raise PermissionDenied('Invalid or expired Office access') from None
+     if payload.get('file_id') != file_id:
+-        raise signing.BadSignature('File mismatch')
++        raise PermissionDenied('Invalid Office document')
++    if not StorageFile.objects.filter(
++        pk=file_id, owner_id=payload.get('user_id'), owner__is_active=True,
++        is_trashed=False,
++    ).exists():
++        raise PermissionDenied('Office access has been revoked')
+     return payload
+ 
+ 
++def save_file_revision(file_obj, content, description, expected_count=None):
++    """Keep old file paths intact and serialize revision numbers per document."""
++    with transaction.atomic():
++        file_obj = StorageFile.objects.select_for_update().get(pk=file_obj.pk)
++        if expected_count is not None and file_obj.version_count != expected_count:
++            raise ValueError('Document changed; reload its version history')
++        # Storage backend chooses a fresh name; previous FileVersion keeps its bytes.
++        file_obj.file.save(file_obj.name, ContentFile(content), save=False)
++        file_obj.file_hash = ''
++        file_obj.save()
++        number = (file_obj.versions.aggregate(n=Max('version_number'))['n'] or 0) + 1
++        file_obj.versions.update(is_current=False)
++        FileVersion.objects.create(
++            file=file_obj, version_number=number, file_data=file_obj.file.name,
++            file_hash=file_obj.file_hash, size=file_obj.size,
++            change_description=description, is_current=True,
++        )
++        file_obj.refresh_from_db()
++        return file_obj
++
++
+ def get_wopi_lock_key(file_id):
+     return f'collabora:wopi-lock:{file_id}'
+ 
+@@ -1106,7 +1137,7 @@ class WopiFileView(View):
+         file_id = int(file_id)
+         token = request.GET.get('access_token') or request.POST.get('access_token')
+         if not token:
+-            raise Http404("Missing access token")
++            raise PermissionDenied("Missing Office access token")
+         return parse_collabora_token(token, file_id)
+ 
+     def get(self, request, file_id, *args, **kwargs):
+@@ -1177,7 +1208,7 @@ class WopiFileContentsView(View):
+         file_id = int(file_id)
+         token = request.GET.get('access_token') or request.POST.get('access_token')
+         if not token:
+-            raise Http404("Missing access token")
++            raise PermissionDenied("Missing Office access token")
+         return parse_collabora_token(token, file_id)
+ 
+     def get(self, request, file_id, *args, **kwargs):
+@@ -1201,10 +1232,23 @@ class WopiFileContentsView(View):
+             return HttpResponse(status=200)
+ 
+         uploaded_content = request.body
+-        file_obj.file.save(file_obj.name, ContentFile(uploaded_content), save=False)
+-        file_obj.file_hash = ''
+-        file_obj.save()
+-        return HttpResponse(status=200)
++        lock = cache.get(get_wopi_lock_key(file_id))
++        if not lock or lock != request.headers.get('X-WOPI-Lock', ''):
++            response = HttpResponse(status=409)
++            response['X-WOPI-Lock'] = lock or ''
++            return response
++        uploaded_file = ContentFile(uploaded_content, name=file_obj.name)
++        valid, message = validate_upload(uploaded_file)
++        if not valid:
++            return JsonResponse({'detail': message}, status=400)
++        try:
++            ensure_quota_available(file_obj.owner, len(uploaded_content))
++        except ValueError as exc:
++            return JsonResponse({'detail': str(exc)}, status=413)
++        file_obj = save_file_revision(file_obj, uploaded_content, 'Saved through Online Office')
++        response = HttpResponse(status=200)
++        response['X-WOPI-ItemVersion'] = str(file_obj.updated_at.timestamp())
++        return response
+ 
+ 
+ class FileRenameView(LoginRequiredMixin, DetailView):

@@ -23,6 +23,7 @@ from app.policy import approve_draft, send_draft
 from app.prospect_scoring import score_products
 from app.research_presentation import present_research
 from app.projects import router as projects_router
+from app.documents import router as documents_router
 from app.prospect_criteria import load_criteria, DEFAULTS, exclusion_reason, germany_evidence, website_evidence
 from app.models import ProspectSearchSettings
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
@@ -46,6 +47,9 @@ def _available_email_accounts(user: User, db: Session) -> list[EmailAccount]:
     return [account for account in user.email_accounts if account.is_active]
 
 ROLE_PERMISSIONS = {
+    "DOCUMENTS_VIEW": "Gemeinsame Dateiablage lesen",
+    "DOCUMENTS_UPLOAD": "Dateien in die gemeinsame Ablage hochladen",
+    "DOCUMENTS_EDIT": "Dokumente online bearbeiten",
     "PROJECT_VIEW": "Projektplanung benutzen",
     "PROJECT_CREATE": "Projekte anlegen",
     "EMAIL_VIEW": "E-Mail-Postfächer lesen",
@@ -267,6 +271,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title=get_settings().app_name, lifespan=lifespan)
 app.include_router(projects_router)
+app.include_router(documents_router)
 
 
 def _browser_error(request: Request, status_code: int, message: str):
@@ -335,6 +340,8 @@ async def browser_auth_handler(request: Request, exception: HTTPException):
         return RedirectResponse("/login", status_code=303)
     if request.url.path.startswith("/projects") and "text/html" in request.headers.get("accept", ""):
         return templates.TemplateResponse(request=request, name="project_error.html", context={"message": exception.detail}, status_code=exception.status_code)
+    if request.url.path.startswith("/documents") and "text/html" in request.headers.get("accept", ""):
+        return templates.TemplateResponse(request=request, name="document_error.html", context={"message": exception.detail}, status_code=exception.status_code)
     return JSONResponse(status_code=exception.status_code, content={"detail": exception.detail})
 # Diese Route stellt die CSS-Datei bereit. Ohne dieses Mounting würde die Seite
 # funktionieren, aber ohne Gestaltung ausgeliefert werden.
@@ -345,7 +352,7 @@ app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")
 def user_help(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     permissions = {permission.name for permission in user.role.permissions}
-    return templates.TemplateResponse(request=request, name="help.html", context={"user": user, "permissions": permissions, "projects_enabled": get_settings().projects_enabled, "can_admin": "ADMIN_SETTINGS" in permissions})
+    return templates.TemplateResponse(request=request, name="help.html", context={"user": user, "permissions": permissions, "projects_enabled": get_settings().projects_enabled, "documents_enabled": get_settings().documents_enabled, "can_admin": "ADMIN_SETTINGS" in permissions})
 
 
 @app.get("/health")
@@ -395,7 +402,8 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     can_projects = get_settings().projects_enabled and any(item.name == "PROJECT_VIEW" for item in user.role.permissions)
     tasks = db.scalars(select(Task).where(Task.status == "open", (Task.assigned_to_user_id == user.id) | (Task.assigned_to_user_id.is_(None))).order_by(Task.due_at.is_(None), Task.due_at).limit(5)).all()
     notifications = db.scalars(select(Notification).where(Notification.user_id == user.id, Notification.is_read.is_(False)).order_by(Notification.created_at.desc()).limit(5)).all()
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "tasks": tasks, "notifications": notifications, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk, "can_marketing": can_marketing, "can_projects": can_projects, "update_status": _update_status()})
+    can_documents = get_settings().documents_enabled and any(item.name == "DOCUMENTS_VIEW" for item in user.role.permissions)
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "tasks": tasks, "notifications": notifications, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk, "can_marketing": can_marketing, "can_projects": can_projects, "can_documents": can_documents, "update_status": _update_status()})
 
 
 @app.get("/tasks", response_class=HTMLResponse)
