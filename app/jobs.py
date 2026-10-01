@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.models import BackgroundJob, Notification, Task
+from app.models import BackgroundJob, Contract, ContractReminder, Notification, Task
 
 Handler = Callable[[Session, Mapping[str, object]], None]
 _HANDLERS: dict[str, Handler] = {}
@@ -78,6 +78,24 @@ def run_pending(db: Session, *, limit: int = 10, stale_after_seconds: int = 900)
         db.add(Notification(user_id=recipient_id, title="Aufgabe fällig", message=task.title, url="/tasks"))
         task.reminder_sent_at = now
     if due_tasks:
+        db.commit()
+    today = now.date().isoformat()
+    due_contract_reminders = db.scalars(
+        select(ContractReminder).where(
+            ContractReminder.completed_at.is_(None),
+            ContractReminder.notification_sent_at.is_(None),
+            ContractReminder.remind_date <= today,
+        )
+    ).all()
+    for reminder in due_contract_reminders:
+        contract = db.get(Contract, reminder.contract_id)
+        if not contract:
+            continue
+        db.add(Notification(user_id=contract.owner_user_id, title="Vertragsfrist beachten",
+                            message=f"{contract.title}: {reminder.title} bis {reminder.due_date}",
+                            url=f"/contracts/{contract.id}"))
+        reminder.notification_sent_at = now
+    if due_contract_reminders:
         db.commit()
     recover_stale_jobs(db, stale_after_seconds=stale_after_seconds)
     jobs = []

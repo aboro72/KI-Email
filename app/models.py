@@ -52,6 +52,13 @@ class User(Base):
     email_accounts: Mapped[list["EmailAccount"]] = relationship(secondary=user_email_accounts, back_populates="users")
 
 
+class DashboardPreference(Base):
+    __tablename__ = "dashboard_preferences"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    shortcuts_json: Mapped[str] = mapped_column(Text, default="[]")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class ProspectSearchSettings(Base):
     __tablename__ = "prospect_search_settings"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -435,3 +442,60 @@ class ProjectComment(Base):
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     author: Mapped[User] = relationship()
+
+
+class Contract(Base):
+    __tablename__ = "contracts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(240), index=True)
+    contract_number: Mapped[str] = mapped_column(String(100), default="", index=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
+    counterparty: Mapped[str] = mapped_column(String(240), default="", index=True)
+    contract_type: Mapped[str] = mapped_column(String(80), default="sonstiges", index=True)
+    status: Mapped[str] = mapped_column(String(30), default="entwurf", index=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    start_date: Mapped[str] = mapped_column(String(10), default="")
+    end_date: Mapped[str] = mapped_column(String(10), default="", index=True)
+    notice_period_days: Mapped[int] = mapped_column(default=0)
+    cancellation_deadline: Mapped[str] = mapped_column(String(10), default="", index=True)
+    auto_renew: Mapped[bool] = mapped_column(Boolean, default=False)
+    renewal_months: Mapped[int] = mapped_column(default=0)
+    description: Mapped[str] = mapped_column(Text, default="")
+    analysis_text: Mapped[str] = mapped_column(Text, default="")
+    ai_status: Mapped[str] = mapped_column(String(30), default="not_requested", index=True)
+    ai_result_json: Mapped[str] = mapped_column(Text, default="{}")
+    ai_error: Mapped[str] = mapped_column(Text, default="")
+    ai_analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    company: Mapped[Company | None] = relationship()
+    owner: Mapped[User] = relationship(foreign_keys=[owner_user_id])
+    documents: Mapped[list["ContractDocument"]] = relationship(back_populates="contract", cascade="all, delete-orphan")
+    reminders: Mapped[list["ContractReminder"]] = relationship(back_populates="contract", cascade="all, delete-orphan")
+
+
+class ContractDocument(Base):
+    __tablename__ = "contract_documents"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.id"), index=True)
+    cloudshare_file_id: Mapped[int] = mapped_column(index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    uploaded_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    contract: Mapped[Contract] = relationship(back_populates="documents")
+
+
+class ContractReminder(Base):
+    __tablename__ = "contract_reminders"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.id"), index=True)
+    title: Mapped[str] = mapped_column(String(240))
+    due_date: Mapped[str] = mapped_column(String(10), index=True)
+    remind_date: Mapped[str] = mapped_column(String(10), index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notification_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    contract: Mapped[Contract] = relationship(back_populates="reminders")

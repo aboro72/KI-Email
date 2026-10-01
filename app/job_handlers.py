@@ -36,6 +36,43 @@ def _analyze_ticket(db, payload):
     db.commit()
 
 
+def _analyze_contract(db, payload):
+    import json
+    from datetime import datetime, timezone
+    from app.bedrock import analyze_contract
+    from app.models import Contract, Notification
+
+    contract = db.get(Contract, int(payload["contract_id"]))
+    if not contract:
+        return
+    contract.ai_status = "running"
+    contract.ai_error = ""
+    db.commit()
+    try:
+        metadata = (
+            f"Vertragspartner: {contract.counterparty}; Typ: {contract.contract_type}; "
+            f"Beginn: {contract.start_date}; Ende: {contract.end_date}; "
+            f"Kündigungsfrist: {contract.cancellation_deadline}"
+        )
+        result = analyze_contract(contract.title, metadata, contract.analysis_text)
+        contract.ai_result_json = json.dumps(result, ensure_ascii=False)
+        contract.ai_status = "completed"
+        contract.ai_analyzed_at = datetime.now(timezone.utc)
+        requester_id = int(payload.get("requested_by_user_id") or contract.owner_user_id)
+        db.add(Notification(user_id=requester_id, title="Vertragsprüfung abgeschlossen",
+                            message=contract.title, url=f"/contracts/{contract.id}"))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        contract = db.get(Contract, int(payload["contract_id"]))
+        if contract:
+            contract.ai_status = "failed"
+            contract.ai_error = str(exc)[:1000]
+            db.commit()
+        raise
+
+
 register_handler("email.sync_account", _sync_account)
 register_handler("crm.company_research", _research_company)
 register_handler("helpdesk.ai_analysis", _analyze_ticket)
+register_handler("contracts.ai_analysis", _analyze_contract)

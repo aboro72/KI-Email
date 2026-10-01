@@ -18,12 +18,13 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine, get_db, initialize_persistence
 from app.jobs import enqueue
-from app.models import Activity, AuditLog, BackgroundJob, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
+from app.models import Activity, AuditLog, BackgroundJob, Company, Contact, Contract, DashboardPreference, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
 from app.prospect_scoring import score_products
 from app.research_presentation import present_research
 from app.projects import router as projects_router
 from app.documents import router as documents_router
+from app.contracts import router as contracts_router
 from app.prospect_criteria import load_criteria, DEFAULTS, exclusion_reason, germany_evidence, website_evidence
 from app.models import ProspectSearchSettings
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
@@ -52,6 +53,9 @@ ROLE_PERMISSIONS = {
     "DOCUMENTS_EDIT": "Dokumente online bearbeiten",
     "PROJECT_VIEW": "Projektplanung benutzen",
     "PROJECT_CREATE": "Projekte anlegen",
+    "CONTRACT_VIEW": "Vertragsverwaltung lesen",
+    "CONTRACT_MANAGE": "Verträge, Dokumente und Fristen verwalten",
+    "CONTRACT_AI": "KI-gestützte Vertragsprüfung anfordern",
     "EMAIL_VIEW": "E-Mail-Postfächer lesen",
     "EMAIL_SEND": "E-Mails versenden",
     "AI_GENERATE": "KI-Vorschläge erzeugen",
@@ -272,6 +276,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title=get_settings().app_name, lifespan=lifespan)
 app.include_router(projects_router)
 app.include_router(documents_router)
+app.include_router(contracts_router)
 
 
 def _browser_error(request: Request, status_code: int, message: str):
@@ -342,6 +347,8 @@ async def browser_auth_handler(request: Request, exception: HTTPException):
         return templates.TemplateResponse(request=request, name="project_error.html", context={"message": exception.detail}, status_code=exception.status_code)
     if request.url.path.startswith("/documents") and "text/html" in request.headers.get("accept", ""):
         return templates.TemplateResponse(request=request, name="document_error.html", context={"message": exception.detail}, status_code=exception.status_code)
+    if request.url.path.startswith("/contracts") and "text/html" in request.headers.get("accept", ""):
+        return templates.TemplateResponse(request=request, name="contract_error.html", context={"message": exception.detail}, status_code=exception.status_code)
     return JSONResponse(status_code=exception.status_code, content={"detail": exception.detail})
 # Diese Route stellt die CSS-Datei bereit. Ohne dieses Mounting würde die Seite
 # funktionieren, aber ohne Gestaltung ausgeliefert werden.
@@ -352,7 +359,7 @@ app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")
 def user_help(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     permissions = {permission.name for permission in user.role.permissions}
-    return templates.TemplateResponse(request=request, name="help.html", context={"user": user, "permissions": permissions, "projects_enabled": get_settings().projects_enabled, "documents_enabled": get_settings().documents_enabled, "can_admin": "ADMIN_SETTINGS" in permissions})
+    return templates.TemplateResponse(request=request, name="help.html", context={"user": user, "permissions": permissions, "projects_enabled": get_settings().projects_enabled, "documents_enabled": get_settings().documents_enabled, "contracts_enabled": get_settings().contracts_enabled, "can_admin": "ADMIN_SETTINGS" in permissions})
 
 
 @app.get("/health")
@@ -388,6 +395,38 @@ def logout():
     return response
 
 
+def _dashboard_shortcuts(user: User) -> list[dict[str, str]]:
+    permissions = {item.name for item in user.role.permissions}
+    settings = get_settings()
+    candidates = [
+        ("inbox", "Posteingang", "/inbox", True),
+        ("compose", "Neue E-Mail", "/compose", "EMAIL_SEND" in permissions),
+        ("tasks", "Aufgaben", "/tasks", True),
+        ("search", "Suche", "/search", True),
+        ("crm", "CRM", "/crm", "CRM_MANAGE" in permissions),
+        ("helpdesk", "Helpdesk", "/helpdesk", "HELPDESK_VIEW" in permissions),
+        ("marketing", "Marketing", "/marketing", "MARKETING_VIEW" in permissions),
+        ("projects", "Projektplanung", "/projects", settings.projects_enabled and "PROJECT_VIEW" in permissions),
+        ("documents", "Dateiablage", "/documents", settings.documents_enabled and "DOCUMENTS_VIEW" in permissions),
+        ("contracts", "Verträge", "/contracts", settings.contracts_enabled and "CONTRACT_VIEW" in permissions),
+        ("admin", "Administration", "/admin", "ADMIN_SETTINGS" in permissions),
+    ]
+    return [{"id": key, "label": label, "url": url} for key, label, url, allowed in candidates if allowed]
+
+
+def _selected_shortcuts(db: Session, user: User, available: list[dict[str, str]]) -> list[str]:
+    preference = db.get(DashboardPreference, user.id)
+    allowed = {item["id"] for item in available}
+    if preference:
+        try:
+            selected = [str(item) for item in json.loads(preference.shortcuts_json)]
+            return [item for item in selected if item in allowed][:6]
+        except (json.JSONDecodeError, TypeError):
+            pass
+    preferred = ["inbox", "tasks", "contracts", "search"]
+    return [item for item in preferred if item in allowed][:4]
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
@@ -403,7 +442,31 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     tasks = db.scalars(select(Task).where(Task.status == "open", (Task.assigned_to_user_id == user.id) | (Task.assigned_to_user_id.is_(None))).order_by(Task.due_at.is_(None), Task.due_at).limit(5)).all()
     notifications = db.scalars(select(Notification).where(Notification.user_id == user.id, Notification.is_read.is_(False)).order_by(Notification.created_at.desc()).limit(5)).all()
     can_documents = get_settings().documents_enabled and any(item.name == "DOCUMENTS_VIEW" for item in user.role.permissions)
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "tasks": tasks, "notifications": notifications, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk, "can_marketing": can_marketing, "can_projects": can_projects, "can_documents": can_documents, "update_status": _update_status()})
+    can_contracts = get_settings().contracts_enabled and any(item.name == "CONTRACT_VIEW" for item in user.role.permissions)
+    available_shortcuts = _dashboard_shortcuts(user)
+    selected_ids = _selected_shortcuts(db, user, available_shortcuts)
+    quick_shortcuts = [item for shortcut_id in selected_ids for item in available_shortcuts if item["id"] == shortcut_id]
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "drafts": drafts, "logs": logs, "tasks": tasks, "notifications": notifications, "unread_count": unread_count or 0, "sent_count": sent_count, "can_crm": can_crm, "can_helpdesk": can_helpdesk, "can_marketing": can_marketing, "can_projects": can_projects, "can_documents": can_documents, "can_contracts": can_contracts, "available_shortcuts": available_shortcuts, "selected_shortcuts": selected_ids, "quick_shortcuts": quick_shortcuts, "message": request.query_params.get("message"), "update_status": _update_status()})
+
+
+@app.post("/dashboard/shortcuts")
+def save_dashboard_shortcuts(request: Request, shortcuts: list[str] = Form(default=[]), db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    available = _dashboard_shortcuts(user)
+    allowed = {item["id"] for item in available}
+    selected = []
+    for shortcut in shortcuts:
+        if shortcut in allowed and shortcut not in selected:
+            selected.append(shortcut)
+    if len(selected) > 6:
+        return RedirectResponse("/dashboard?message=Bitte+höchstens+6+Schnellzugriffe+auswählen", status_code=303)
+    preference = db.get(DashboardPreference, user.id) or DashboardPreference(user_id=user.id)
+    preference.shortcuts_json = json.dumps(selected)
+    db.add(preference)
+    db.add(AuditLog(action="dashboard.shortcuts_updated", actor_user_id=user.id,
+                    details=json.dumps({"shortcuts": selected})))
+    db.commit()
+    return RedirectResponse("/dashboard?message=Schnellzugriffe+gespeichert", status_code=303)
 
 
 @app.get("/tasks", response_class=HTMLResponse)
@@ -473,6 +536,10 @@ def global_search(request: Request, q: str = "", db: Session = Depends(get_db)):
             results.append({"kind": "Kampagne", "title": item.name, "detail": item.subject, "url": f"/marketing/campaigns/{item.id}"})
         for item in db.scalars(select(KnowledgeArticle).where(or_(KnowledgeArticle.title.ilike(term), KnowledgeArticle.summary.ilike(term), KnowledgeArticle.content.ilike(term), KnowledgeArticle.keywords.ilike(term))).limit(10)).all():
             results.append({"kind": "Wissensartikel", "title": item.title, "detail": item.product, "url": "/helpdesk/knowledge"})
+        permissions = {permission.name for permission in user.role.permissions}
+        if get_settings().contracts_enabled and "CONTRACT_VIEW" in permissions:
+            for item in db.scalars(select(Contract).where(or_(Contract.title.ilike(term), Contract.contract_number.ilike(term), Contract.counterparty.ilike(term), Contract.description.ilike(term))).limit(10)).all():
+                results.append({"kind": "Vertrag", "title": item.title, "detail": item.counterparty or item.contract_number, "url": f"/contracts/{item.id}"})
     return templates.TemplateResponse(request=request, name="search.html", context={"user": user, "query": query, "results": results})
 
 

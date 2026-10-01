@@ -21,11 +21,12 @@ def https_url(value):
 
 
 class CloudShareClient:
-    def __init__(self, settings=None, transport=None):
+    def __init__(self, settings=None, transport=None, folder_id=None):
         self.settings = settings or get_settings()
         self.base_url = https_url(self.settings.cloudshare_base_url)
         self.office_url = https_url(self.settings.office_base_url)
-        if not self.settings.cloudshare_username or not self.settings.cloudshare_password or self.settings.cloudshare_folder_id <= 0:
+        self.folder_id = self.settings.cloudshare_folder_id if folder_id is None else folder_id
+        if not self.settings.cloudshare_username or not self.settings.cloudshare_password or self.folder_id <= 0:
             raise StorageError("CloudShare-Zugang und Ablageordner müssen eingerichtet werden.")
         self.http = httpx.Client(base_url=self.base_url, timeout=max(10, self.settings.cloudshare_timeout),
                                  follow_redirects=False, transport=transport)
@@ -81,17 +82,17 @@ class CloudShareClient:
             raise StorageError("CloudShare lieferte ein ungültiges Antwortformat.") from None
 
     def files(self):
-        data = self.json(self.request("GET", f"/api/folders/{self.settings.cloudshare_folder_id}/contents/"))
+        data = self.json(self.request("GET", f"/api/folders/{self.folder_id}/contents/"))
         files = data.get("files")
         if not isinstance(files, list) or any(not isinstance(f, dict) for f in files):
             raise StorageError("Die CloudShare-Dateiliste ist ungültig.")
-        return [f for f in files if f.get("folder") == self.settings.cloudshare_folder_id]
+        return [f for f in files if f.get("folder") == self.folder_id]
 
     def file(self, file_id):
         if file_id <= 0:
             raise StorageError("Ungültige Datei.")
         data = self.json(self.request("GET", f"/api/files/{file_id}/"))
-        if data.get("folder") != self.settings.cloudshare_folder_id:
+        if data.get("folder") != self.folder_id:
             raise StorageError("Diese Datei gehört nicht zur AboroDesk-Ablage.")
         return data
 
@@ -101,7 +102,7 @@ class CloudShareClient:
         if not name or len(name) > 255 or any(c in name for c in '/\\\x00\r\n'):
             raise StorageError("Der Dateiname ist ungültig.")
         return self.json(self.request("POST", "/api/files/", data={
-            "name": name, "folder": str(self.settings.cloudshare_folder_id), "is_public": "false",
+            "name": name, "folder": str(self.folder_id), "is_public": "false",
         }, files={"file": (name, content, mime_type or "application/octet-stream")}))
 
     def download(self, file_id):
@@ -145,3 +146,8 @@ class CloudShareClient:
 @lru_cache(maxsize=1)
 def storage_client():
     return CloudShareClient()
+
+
+@lru_cache(maxsize=1)
+def contract_storage_client():
+    return CloudShareClient(folder_id=get_settings().contracts_cloudshare_folder_id)

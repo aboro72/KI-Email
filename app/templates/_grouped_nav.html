@@ -1,0 +1,46 @@
+{% set permission_names = user.role.permissions|map(attribute='name')|list if user is defined else [] %}
+{% set nav_crm = can_crm if can_crm is defined else 'CRM_MANAGE' in permission_names %}
+{% set nav_helpdesk = can_helpdesk if can_helpdesk is defined else 'HELPDESK_VIEW' in permission_names %}
+{% set nav_marketing = can_marketing if can_marketing is defined else 'MARKETING_VIEW' in permission_names %}
+{% set nav_projects = can_projects if can_projects is defined else 'PROJECT_VIEW' in permission_names %}
+{% set nav_documents = can_documents if can_documents is defined else 'DOCUMENTS_VIEW' in permission_names %}
+{% set nav_contracts = can_contracts if can_contracts is defined else 'CONTRACT_VIEW' in permission_names %}
+<nav class="grouped-nav" aria-label="Hauptnavigation">
+  <a href="/dashboard">Dashboard</a>
+  <details class="nav-group">
+    <summary>Arbeit</summary>
+    <div class="nav-dropdown">
+      <a href="/inbox">Posteingang</a>
+      <a href="/compose">Neue E-Mail</a>
+      <a href="/tasks">Aufgaben</a>
+      {% if nav_projects %}<a href="/projects">Projektplanung</a>{% endif %}
+    </div>
+  </details>
+  {% if nav_crm or nav_helpdesk or nav_marketing %}
+  <details class="nav-group">
+    <summary>Kunden &amp; Service</summary>
+    <div class="nav-dropdown">
+      {% if nav_crm %}<a href="/crm">CRM-Übersicht</a><a href="/crm/companies">Firmen</a><a href="/crm/contacts">Kontakte</a><a href="/crm/leads">Leads</a>{% endif %}
+      {% if nav_helpdesk %}<a href="/helpdesk">Helpdesk</a><a href="/helpdesk/knowledge">Wissensbasis</a>{% endif %}
+      {% if nav_marketing %}<a href="/marketing">Marketing</a>{% endif %}
+    </div>
+  </details>
+  {% endif %}
+  {% if nav_documents or nav_contracts %}
+  <details class="nav-group">
+    <summary>Dokumente</summary>
+    <div class="nav-dropdown">
+      {% if nav_documents %}<a href="/documents">Dateiablage</a>{% endif %}
+      {% if nav_contracts %}<a href="/contracts">Verträge</a>{% endif %}
+    </div>
+  </details>
+  {% endif %}
+  <a href="/search">Suche</a>
+  {% if user is defined and user.role.name == 'admin' %}
+  <details class="nav-group">
+    <summary>System</summary>
+    <div class="nav-dropdown"><a href="/admin">Administration</a><a href="/admin/users">Benutzer</a><a href="/admin/roles">Rollen &amp; Rechte</a><a href="/admin/email-accounts">E-Mail-Konten</a><a href="/help">Hilfe</a></div>
+  </details>
+  {% else %}<a href="/help">Hilfe</a>{% endif %}
+  <form method="post" action="/logout"><button class="link-button">Abmelden</button></form>
+</nav>

@@ -37,6 +37,8 @@ py -3 -m app.cli create-admin
 
 Der Fortschritt wird in [STATUS.md](STATUS.md) fortgeschrieben.
 
+Die modulare Vertragsverwaltung ist in [docs/VERTRAGSVERWALTUNG-2026-10-01.md](docs/VERTRAGSVERWALTUNG-2026-10-01.md) dokumentiert. Sie verwaltet Vertragsdaten, geschützte CloudShare-Dokumente, Fristen, Erinnerungen und ausdrücklich überprüfungspflichtige KI-Hinweise.
+
 ## Tests
 
 ```powershell

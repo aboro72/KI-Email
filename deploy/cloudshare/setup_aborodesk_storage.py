@@ -22,6 +22,11 @@ if credential_file.exists():
     folder = StorageFolder.objects.get(pk=data['folder_id'], owner=user)
     if not user.check_password(data['password']):
         raise RuntimeError('Stored CloudShare credentials no longer match; refusing automatic rotation')
+    contracts_folder = StorageFolder.objects.filter(owner=user, parent=folder, name='AboroDesk Verträge').first()
+    if not contracts_folder:
+        contracts_folder = StorageFolder.objects.create(owner=user, parent=folder, name='AboroDesk Verträge', is_public=False)
+    data['contracts_folder_id'] = contracts_folder.pk
+    credential_file.write_text(json.dumps(data))
 else:
     username = 'aborodesk_storage_api'
     if User.objects.filter(username=username).exists():
@@ -36,7 +41,9 @@ else:
             folder.save()
         else:
             folder = StorageFolder.objects.create(owner=user, name='AboroDesk', is_public=False)
-        data = {'username': username, 'password': password, 'folder_id': folder.pk}
+        contracts_folder = StorageFolder.objects.create(owner=user, parent=folder, name='AboroDesk Verträge', is_public=False)
+        data = {'username': username, 'password': password, 'folder_id': folder.pk,
+                'contracts_folder_id': contracts_folder.pk}
         # 0600 before any secret bytes are written.
         fd = os.open(credential_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'w') as stream:
