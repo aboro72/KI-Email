@@ -6,6 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "AboroDesk Developer"
     environment: str = "development"
+    projects_enabled: bool = True
+    project_lock_file: str = ".project-planning.lock"
     database_url: str = "sqlite:///./ki_email.db"
     secret_key: str = "development-only-change-me"
     admin_email: str = "admin@example.com"

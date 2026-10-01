@@ -65,6 +65,32 @@ def test_sessions_preserve_other_sessions_fields_and_new_rows(store):
         assert fresh.get(Company, 2).name == 'New'
 
 
+def test_project_roles_and_cards_survive_mongo_session_reload(store):
+    from app.models import Project, ProjectCard, ProjectMember, Role, User
+    with persistence.SessionLocal() as db:
+        db.add(Role(id=1, name='project_test'))
+        db.flush()
+        db.add_all([User(id=1, email='a@test.invalid', display_name='Alice', password_hash='test', role_id=1), User(id=2, email='b@test.invalid', display_name='Bob', password_hash='test', role_id=1)])
+        db.flush()
+        db.add_all([Project(id=1, name='A', leader_user_id=1, created_by_user_id=1), Project(id=2, name='B', leader_user_id=2, created_by_user_id=1)])
+        db.flush()
+        db.add_all([ProjectMember(project_id=1, user_id=2), ProjectMember(project_id=2, user_id=1)])
+        db.add(ProjectCard(id=1, project_id=1, title='Karte', created_by_user_id=1, assignee_user_id=2))
+        db.commit()
+    with persistence.SessionLocal() as fresh:
+        assert fresh.get(Project, 1).leader_user_id == 1
+        assert fresh.get(Project, 2).leader_user_id == 2
+        assert fresh.get(ProjectMember, (1, 2)) is not None
+        assert fresh.get(ProjectMember, (2, 1)) is not None
+        card = fresh.get(ProjectCard, 1)
+        card.status = 'doing'
+        card.revision += 1
+        fresh.commit()
+    with persistence.SessionLocal() as fresh:
+        assert fresh.get(ProjectCard, 1).status == 'doing'
+        assert fresh.get(ProjectCard, 1).revision == 2
+
+
 def test_stale_session_cannot_resurrect_deleted_company(store):
     with persistence.SessionLocal() as first, persistence.SessionLocal() as second:
         company = first.get(Company, 1)

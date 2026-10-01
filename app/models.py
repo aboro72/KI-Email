@@ -383,3 +383,55 @@ class TicketComment(Base):
     is_internal: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     ticket: Mapped[Ticket] = relationship(back_populates="comments")
+
+
+class Project(Base):
+    __tablename__ = "projects"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    leader_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    wip_limit: Mapped[int] = mapped_column(default=3)
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    leader: Mapped[User] = relationship(foreign_keys=[leader_user_id])
+
+
+class ProjectMember(Base):
+    __tablename__ = "project_members"
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    user: Mapped[User] = relationship()
+
+
+class ProjectCard(Base):
+    __tablename__ = "project_cards"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    title: Mapped[str] = mapped_column(String(240))
+    description: Mapped[str] = mapped_column(Text, default="")
+    acceptance_criteria: Mapped[str] = mapped_column(Text, default="")
+    card_type: Mapped[str] = mapped_column(String(20), default="task")
+    status: Mapped[str] = mapped_column(String(20), default="backlog", index=True)
+    priority: Mapped[str] = mapped_column(String(20), default="normal")
+    assignee_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    due_date: Mapped[str] = mapped_column(String(10), default="")
+    story_points: Mapped[int | None] = mapped_column(nullable=True)
+    position: Mapped[int] = mapped_column(default=0)
+    revision: Mapped[int] = mapped_column(default=1)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_user_id])
+
+
+class ProjectComment(Base):
+    __tablename__ = "project_comments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    card_id: Mapped[int] = mapped_column(ForeignKey("project_cards.id"), index=True)
+    author_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    author: Mapped[User] = relationship()

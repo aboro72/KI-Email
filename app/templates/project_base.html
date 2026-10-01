@@ -1,0 +1,3 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{% block title %}Projektplanung{% endblock %} · AboroDesk</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/projects.css?v=20261001"></head><body class="project-module">
+<header><a class="brand" href="/dashboard">AboroDesk</a><nav aria-label="Navigation"><a href="/dashboard">Dashboard</a><a href="/projects">Projekte</a><a href="/tasks">Meine Aufgaben</a><a href="/help">Hilfe</a><form method="post" action="/logout"><button class="link-button">Abmelden</button></form></nav></header>
+<main class="shell">{% block content %}{% endblock %}</main>{% block scripts %}{% endblock %}</body></html>
