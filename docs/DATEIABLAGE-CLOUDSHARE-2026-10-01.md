@@ -85,6 +85,7 @@ Der Patch wurde gegen eine gesonderte, normalisierte Kopie der Originalquellen e
 - CloudShare-Code vorher: `/home/storage/Cloude/rollback-storage-api-20261001/`.
 - Nginx vorher dort: `nginx_cloude.conf`; aktive Datei `/etc/nginx/sites-available/cloude`.
 - AboroDesk-Code und vorherige Umgebung: `/opt/aborodesk/deploy/rollback-storage-20261001/`, Verzeichnis geschützt. Vorherige Hosts-Datei: `hosts`.
+- Zusätzlich dauerhaft außerhalb des vom Updater ersetzten App-Verzeichnisses gesichert: `/var/backups/aborodesk/storage-20261001/rollback-storage-20261001/` (rootgeschützt). Bei einer späteren automatischen Aktualisierung diesen unabhängigen Rückweg verwenden.
 - Zum einfachen Abschalten `DOCUMENTS_ENABLED=false` setzen und AboroDesk neu starten. Dateien bleiben erhalten. Keine automatischen Löschungen des CloudShare-Ordners oder Benutzers.
 
 ## Nächste erforderliche Schritte für Vertragsverwaltung
