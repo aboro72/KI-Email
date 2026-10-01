@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     nova_base_url: str = "https://ki.ml-projekt.de/v1"
     nova_api_key: str = ""
     nova_model: str = "local"
+    nova_request_timeout: float = 180
+    nova_max_retries: int = 3
+    nova_request_lock_file: str = ".nova-request.lock"
     bedrock_model_id: str = "eu.anthropic.claude-sonnet-4-6"
     bedrock_api_key_file: str = "bedrock-long-term-api-key.csv"
     update_status_file: str = "/var/lib/aborodesk-updater/status.json"

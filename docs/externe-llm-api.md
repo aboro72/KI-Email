@@ -91,3 +91,11 @@ Auf dem AboroDesk-Server sind `AI_PROVIDER=nova`, `NOVA_BASE_URL=https://ki.ml-p
 Die authentifizierte Modellabfrage lieferte HTTP 200 mit `local` und `bedrock`. Generierungstests erhielten bislang HTTP 429 (Kapazität belegt); eine erfolgreiche strukturierte Qwen-Auswertung ist noch nicht bestätigt. Der Adapter gibt verständliche Fehler ohne Zugangsdaten aus. Lokale Tests: 11 bestanden, einschließlich Request-/Antwortabbildung und Fehlerbehandlung.
 
 Rückwechsel nach erfolgreicher Bedrock-Prüfung: `AI_PROVIDER=bedrock` in der Dienstkonfiguration setzen und Anwendung sowie Worker neu starten. Es gibt keinen automatischen Wechsel des Backends.
+
+### Timeout, Wiederholungen und Reihenfolge (01.10.2026)
+
+- `NOVA_REQUEST_TIMEOUT=180`: HTTP-Timeout für Verbindungsaufbau, Lesen und Schreiben mindestens 180 Sekunden; höhere Werte sind konfigurierbar. Dies ist kein festes Gesamtlimit einschließlich Warteschlange und Wiederholungen.
+- `NOVA_MAX_RETRIES=3`: bei 429 maximal drei Wiederholungen zusätzlich zum ersten Versuch. `Retry-After` wird beachtet, bei fehlendem/ungültigem Wert fünf Sekunden gewartet. Wartezeit mindestens fünf Sekunden; bei mehr als 60 Sekunden wird statt einer vorzeitigen Wiederholung ein Fehler zurückgegeben.
+- `NOVA_REQUEST_LOCK_FILE=/var/lib/aborodesk/nova-request.lock`: gemeinsame Dateisperre auf dem Server für Webapp, Worker und weitere entsprechend konfigurierte Prozesse. Sie bleibt auch zwischen den Wiederholungen gehalten, damit nur eine Anfrage gleichzeitig läuft. Externe Nova-Nutzer sind nicht von dieser lokalen Sperre erfasst.
+- Die Sperrdatei nicht während laufender Anfragen löschen oder ersetzen. Auf einem weiteren Server wäre eine serverübergreifende Sperre erforderlich.
+- Lokale Tests: 14 bestanden, einschließlich Retry-Limit, Retry-After, erfolgreicher Wiederholung und serieller Ausführung.
