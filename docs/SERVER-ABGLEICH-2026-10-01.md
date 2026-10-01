@@ -51,8 +51,8 @@ Vorherige AboroDesk-Dateien wurden zusätzlich unter `/tmp/db.py.before-abgleich
 
 ## Noch zu verfolgen
 
-Frühere fehlgeschlagene Firmenrecherchen mit Bedrock-/Nova-Zugangsfehlern werden erneut eingereiht. Erfolgreicher Testauftrag bedeutet nicht, dass bereits alle Firmen fertig recherchiert sind. Unzugängliche Websites und dauerhafte Fehler müssen weiterhin im CRM geprüft werden.
+29 frühere fehlgeschlagene Firmenrecherchen mit Bedrock-/Nova-Zugangsfehlern wurden erneut eingereiht. Erfolgreicher Testauftrag bedeutet nicht, dass bereits alle Firmen fertig recherchiert sind. Unzugängliche Websites und dauerhafte Fehler müssen weiterhin im CRM geprüft werden.
 
 Die aktuelle Suche filtert bekannte Portale und Produktbegriffe, ist aber noch kein präziser Firmenfinder. Als nächste Produktverbesserungen: abgelehnte Domains merken, Ergebnislinks statt beliebiger Suchseitenlinks auslesen, gezielte Branchen-/Produktzuordnung und verständliche Fortschrittsanzeige.
 
-GitHub-Schreibrechte waren zuletzt blockiert. Direkt installierte Änderungen mit dem GitHub-Stand abgleichen, bevor ein späteres Update sie ersetzt. Nova-Änderungen separat im zugehörigen Projekt sichern; sie liegen nicht im AboroDesk-Repository.
+GitHub-Push dieser Änderungen wurde erneut mit HTTP 403 abgelehnt (angemeldetes Konto `ML-PIT`, Repository `aboro72/KI-Email`). Code ist lokal committed und auf dem Server installiert. Direkt installierte Änderungen mit dem GitHub-Stand abgleichen, bevor ein späteres Update sie ersetzt. Nova-Änderungen separat im zugehörigen Projekt sichern; sie liegen nicht im AboroDesk-Repository.
