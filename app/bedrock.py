@@ -11,15 +11,15 @@ from app.config import get_settings
 
 
 def _load_api_key() -> str:
-    existing = os.getenv("AWS_BEARER_TOKEN_BEDROCK")
-    if existing:
-        return existing
     path = Path(get_settings().bedrock_api_key_file)
-    if not path.exists():
-        return ""
-    with path.open(newline="", encoding="utf-8-sig") as handle:
-        row = next(csv.DictReader(handle), {})
-    return (row.get("API key") or "").strip()
+    if path.exists():
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            row = next(csv.DictReader(handle), {})
+        api_key = (row.get("API key") or "").strip()
+        if api_key:
+            return api_key
+    # Nur für lokale Entwicklung bzw. Umgebungen ohne Schlüsseldatei.
+    return os.getenv("AWS_BEARER_TOKEN_BEDROCK", "").strip()
 
 
 def _client():

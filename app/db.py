@@ -131,6 +131,11 @@ SessionLocal = sessionmaker(bind=engine, class_=PersistenceSession, autoflush=Fa
 def initialize_persistence() -> None:
     if mongo_store is None:
         return
+    # Eigenständige Prozesse (Worker, CLI, Kandidatensuche) besitzen jeweils
+    # ihre eigene In-Memory-SQLite-Arbeitsdatenbank. Sie muss vor dem Import
+    # existieren; andernfalls scheitert der Import schon beim Leeren neuer
+    # Tabellen wie ticket_comments.
+    Base.metadata.create_all(engine)
     mongo_store.ping()
     with engine.begin() as connection:
         mongo_store.load_into_sqlite(connection)

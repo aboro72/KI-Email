@@ -12,17 +12,15 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import delete, func, inspect, or_, select, text, update
+from sqlalchemy import delete, func, inspect, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db import Base, SessionLocal, engine, get_db, initialize_persistence
+from app.db import Base, engine, get_db, initialize_persistence
 from app.jobs import enqueue
 from app.models import Activity, AuditLog, BackgroundJob, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
 from app.prospect_scoring import score_products
-from app.prospect_criteria import load_criteria, DEFAULTS, exclusion_reason, germany_evidence, website_evidence
-from app.models import ProspectSearchSettings
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -112,23 +110,15 @@ def research_company_background(company_id: int) -> None:
         company.research_status = "running"
         company.research_error = ""
         db.commit()
-        page_text, legal_text, final_url = website_evidence(company.website)
-        reason = exclusion_reason(final_url, page_text + " " + legal_text, load_criteria(db))
-        if not reason and not germany_evidence(legal_text):
-            reason = "Deutscher Firmensitz nicht belegt; bitte Impressum manuell prüfen"
-        if reason:
-            company.research_status = "skipped"
-            company.research_error = reason
-            db.commit()
-            return
-        result = research_company(company.name, company.website, page_text + "\nImpressum:\n" + legal_text[:6000])
+        page_text = _fetch_public_website(company.website)
+        result = research_company(company.name, company.website, page_text)
         now = datetime.now(timezone.utc)
         company.industry = result["industry"] or company.industry
         company.source_url = company.website
         company.researched_at = now
         company.research_status = "completed"
         company.research_error = ""
-        product_fit = score_products(page_text)
+        product_fit = score_products(f"{company.name} {company.industry} {page_text} {result['summary']} {result['sales_pitch']}")
         company.product_fit_json = json.dumps(product_fit, ensure_ascii=False)
         if product_fit:
             company.best_product = str(product_fit[0]["product"])
@@ -150,7 +140,7 @@ def research_company_background(company_id: int) -> None:
                 lead = Lead(company_id=company.id, status="neu", score=0)
                 db.add(lead)
             lead.sales_pitch = result["sales_pitch"]
-            lead.next_action = "Produktvorschlag und KI-Recherche prüfen; Gesprächsentwurf freigeben"
+            lead.next_action = "KI-Recherche prüfen und LMS-Discovery-Entwurf freigeben"
             lead.notes = "Automatisch aus öffentlicher Website recherchiert; kein automatischer Versand."
         db.commit()
     except Exception as exc:
@@ -160,7 +150,6 @@ def research_company_background(company_id: int) -> None:
             company.research_status = "failed"
             company.research_error = str(exc)[:1000]
             db.commit()
-        raise
     finally:
         db.close()
 
@@ -226,7 +215,7 @@ async def lifespan(_: FastAPI):
                 with engine.begin() as connection:
                     connection.execute(text(f"ALTER TABLE tickets ADD COLUMN {name} {definition}"))
     initialize_persistence()
-    with SessionLocal() as db:
+    with next(get_db()) as db:
         permissions = {}
         for name in ROLE_PERMISSIONS:
             permission = db.scalar(select(Permission).where(Permission.name == name))
@@ -689,44 +678,6 @@ def crm_dashboard(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(request=request, name="crm.html", context={"user": user, "companies": companies, "contacts": contacts, "leads": leads, "users": users, "activities": activities, "message": request.query_params.get("message")})
 
 
-@app.get("/crm/research-settings", response_class=HTMLResponse)
-def prospect_settings(request: Request, db: Session = Depends(get_db)):
-    user = require_user(request, db)
-    require_permission(user, "CRM_MANAGE")
-    return templates.TemplateResponse(request=request, name="crm_research_settings.html", context={"user": user, "criteria": load_criteria(db), "message": request.query_params.get("message")})
-
-
-@app.post("/crm/research-settings")
-async def save_prospect_settings(request: Request, db: Session = Depends(get_db)):
-    user = require_user(request, db)
-    require_permission(user, "CRM_MANAGE")
-    form = await request.form()
-    def lines(key):
-        value = str(form.get(key, ""))
-        if len(value) > 10000:
-            raise HTTPException(400, "Zu viele Suchkriterien")
-        return list(dict.fromkeys(line.strip() for line in value.splitlines() if line.strip()))
-    config = {"queries": {key: lines(key)[:10] for key in DEFAULTS["queries"]}, "excluded_domains": lines("excluded_domains"), "excluded_phrases": [v.lower() for v in lines("excluded_phrases")]}
-    if any(not re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", domain) for domain in config["excluded_domains"]):
-        raise HTTPException(400, "Ausschlüsse als Domain ohne https:// eintragen")
-    try:
-        config["min_score"] = int(str(form.get("min_score", "20")))
-        config["per_query"] = int(str(form.get("per_query", "2")))
-    except ValueError:
-        raise HTTPException(400, "Bitte gültige Zahlen eingeben")
-    if not 20 <= config["min_score"] <= 100 or not 1 <= config["per_query"] <= 10:
-        raise HTTPException(400, "Score: 20–100; Treffer pro Suche: 1–10")
-    row = db.get(ProspectSearchSettings, 1)
-    if row is None:
-        row = ProspectSearchSettings(id=1)
-        db.add(row)
-    row.settings_json = json.dumps(config, ensure_ascii=False)
-    row.updated_at = datetime.now(timezone.utc)
-    db.add(AuditLog(action="crm.research_settings.updated", actor_user_id=user.id, details=json.dumps(config, ensure_ascii=False)))
-    db.commit()
-    return RedirectResponse("/crm/research-settings?message=Suchkriterien+gespeichert", status_code=303)
-
-
 @app.get("/crm/companies", response_class=HTMLResponse)
 def crm_companies(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
@@ -769,12 +720,10 @@ def delete_company(company_id: int, request: Request, db: Session = Depends(get_
         return RedirectResponse("/crm/companies?message=Firma+nicht+gefunden", status_code=303)
 
     contact_ids = [contact.id for contact in db.scalars(select(Contact).where(Contact.company_id == company.id)).all()]
-    lead_ids = list(db.scalars(select(Lead.id).where(Lead.company_id == company.id)))
     # Kampagnenhistorien bleiben erhalten; nur die optionale CRM-Verknüpfung wird gelöst.
     if contact_ids:
-        db.execute(update(MarketingRecipient).where(MarketingRecipient.contact_id.in_(contact_ids)).values(contact_id=None))
-        db.execute(update(Lead).where(Lead.contact_id.in_(contact_ids), Lead.company_id != company.id).values(contact_id=None))
-    db.execute(delete(Activity).where(or_(Activity.company_id == company.id, Activity.contact_id.in_(contact_ids), Activity.lead_id.in_(lead_ids))))
+        db.execute(delete(MarketingRecipient).where(MarketingRecipient.contact_id.in_(contact_ids)).values(contact_id=None))
+    db.execute(delete(Activity).where(Activity.company_id == company.id))
     db.execute(delete(Lead).where(Lead.company_id == company.id))
     if contact_ids:
         db.execute(delete(Contact).where(Contact.id.in_(contact_ids)))

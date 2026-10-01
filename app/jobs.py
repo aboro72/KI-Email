@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.models import BackgroundJob, Notification, Task
@@ -29,7 +29,46 @@ def enqueue(db: Session, job_type: str, payload: Mapping[str, object], *, max_at
     return job
 
 
-def run_pending(db: Session, *, limit: int = 10) -> list[BackgroundJob]:
+def recover_stale_jobs(db: Session, *, stale_after_seconds: int = 900) -> int:
+    """Gibt nach einem Worker-Abbruch verwaiste Jobs kontrolliert wieder frei."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=max(1, stale_after_seconds))
+    retryable = db.execute(
+        update(BackgroundJob)
+        .where(BackgroundJob.status == "running", BackgroundJob.locked_at.is_not(None), BackgroundJob.locked_at < cutoff, BackgroundJob.attempts < BackgroundJob.max_attempts)
+        .values(status="queued", locked_at=None, available_at=now, error="Worker-Neustart erkannt; Aufgabe wird erneut versucht.")
+    ).rowcount
+    exhausted = db.execute(
+        update(BackgroundJob)
+        .where(BackgroundJob.status == "running", BackgroundJob.locked_at.is_not(None), BackgroundJob.locked_at < cutoff, BackgroundJob.attempts >= BackgroundJob.max_attempts)
+        .values(status="failed", finished_at=now, error="Worker-Neustart erkannt; maximale Anzahl Versuche erreicht.")
+    ).rowcount
+    if retryable or exhausted:
+        db.commit()
+    return retryable + exhausted
+
+
+def _claim_next_job(db: Session, now: datetime) -> BackgroundJob | None:
+    """Beansprucht genau einen Job per bedingtem Update, auch bei mehreren Workern."""
+    candidate_ids = db.scalars(
+        select(BackgroundJob.id)
+        .where(BackgroundJob.status == "queued", BackgroundJob.available_at <= now)
+        .order_by(BackgroundJob.created_at)
+        .limit(10)
+    ).all()
+    for job_id in candidate_ids:
+        claimed = db.execute(
+            update(BackgroundJob)
+            .where(BackgroundJob.id == job_id, BackgroundJob.status == "queued")
+            .values(status="running", locked_at=now, attempts=BackgroundJob.attempts + 1)
+        ).rowcount
+        if claimed:
+            db.commit()
+            return db.get(BackgroundJob, job_id)
+    return None
+
+
+def run_pending(db: Session, *, limit: int = 10, stale_after_seconds: int = 900) -> list[BackgroundJob]:
     """Verarbeitet eine begrenzte Anzahl Jobs; ein Worker kann diese Funktion zyklisch aufrufen."""
     now = datetime.now(timezone.utc)
     # Erinnerungen werden idempotent erzeugt: pro Aufgabe genau eine fällige Meldung.
@@ -40,12 +79,13 @@ def run_pending(db: Session, *, limit: int = 10) -> list[BackgroundJob]:
         task.reminder_sent_at = now
     if due_tasks:
         db.commit()
-    jobs = db.scalars(select(BackgroundJob).where(BackgroundJob.status == "queued", BackgroundJob.available_at <= now).order_by(BackgroundJob.created_at).limit(limit)).all()
-    for job in jobs:
-        job.status = "running"
-        job.locked_at = now
-        job.attempts += 1
-        db.commit()
+    recover_stale_jobs(db, stale_after_seconds=stale_after_seconds)
+    jobs = []
+    for _ in range(limit):
+        job = _claim_next_job(db, datetime.now(timezone.utc))
+        if job is None:
+            break
+        jobs.append(job)
         try:
             handler = _HANDLERS.get(job.job_type)
             if handler is None:
