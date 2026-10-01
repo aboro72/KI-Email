@@ -2,6 +2,8 @@
 
 Stand: 30.09.2026, Europe/Berlin. Dieses Dokument ist der Einstieg für die nächste Arbeitssitzung. Es enthält keine Passwörter, Datenbank-Zugangsdaten oder API-Schlüssel.
 
+**Aktueller Nachtrag 01.10.2026:** Der API-/Serverabgleich ist in [SERVER-ABGLEICH-2026-10-01.md](SERVER-ABGLEICH-2026-10-01.md) dokumentiert. Qwen-Auswertungen für E-Mail, Helpdesk und CRM wurden erfolgreich geprüft, einschließlich Worker, gespeicherter Produktwerte und Webanzeige. Persistenzüberschreibungen und der bekannte Firmenlöschbefehl wurden korrigiert. Die folgenden älteren Offen-Punkte sind als historische Bestandsaufnahme zu lesen; für die nächsten Schritte zuerst den neuen Serverbericht verwenden.
+
 ## Ziel und verbindliche Entscheidungen
 
 Aktualisierung 01.10.2026: Auf Wunsch des Benutzers wurde Nova/Qwen vorübergehend aktiviert (`AI_PROVIDER=nova`, `NOVA_MODEL=local`). Adapter `app/nova.py` bedient die bisherigen KI-Aufgaben; Schlüssel nur in der Serverkonfiguration. Authentifizierte Modellabfrage erfolgreich (HTTP 200); Generierung bisher durch HTTP 429 blockiert. Details und Rückwechsel in `docs/externe-llm-api.md`. Die nachfolgende ältere Aussage „noch nicht implementiert“ beschreibt den Stand vor dieser Umstellung.

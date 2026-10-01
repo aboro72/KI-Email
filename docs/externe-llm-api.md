@@ -94,6 +94,8 @@ Rückwechsel nach erfolgreicher Bedrock-Prüfung: `AI_PROVIDER=bedrock` in der D
 
 ### Timeout, Wiederholungen und Reihenfolge (01.10.2026)
 
+Nach erfolgreichem Serverabgleich gilt auf AboroDesk `NOVA_REQUEST_TIMEOUT=300`, intern llama.cpp 180 Sekunden und Nginx 300 Sekunden. Strukturierte E-Mail-, Helpdesk- und CRM-Auswertungen wurden erfolgreich getestet. Details: [SERVER-ABGLEICH-2026-10-01.md](SERVER-ABGLEICH-2026-10-01.md). Die früher dokumentierten 429-Tests beschreiben den Zustand vor diesem Abgleich.
+
 - `NOVA_REQUEST_TIMEOUT=180`: HTTP-Timeout für Verbindungsaufbau, Lesen und Schreiben mindestens 180 Sekunden; höhere Werte sind konfigurierbar. Dies ist kein festes Gesamtlimit einschließlich Warteschlange und Wiederholungen.
 - `NOVA_MAX_RETRIES=3`: bei 429 maximal drei Wiederholungen zusätzlich zum ersten Versuch. `Retry-After` wird beachtet, bei fehlendem/ungültigem Wert fünf Sekunden gewartet. Wartezeit mindestens fünf Sekunden; bei mehr als 60 Sekunden wird statt einer vorzeitigen Wiederholung ein Fehler zurückgegeben.
 - `NOVA_REQUEST_LOCK_FILE=/var/lib/aborodesk/nova-request.lock`: gemeinsame Dateisperre auf dem Server für Webapp, Worker und weitere entsprechend konfigurierte Prozesse. Sie bleibt auch zwischen den Wiederholungen gehalten, damit nur eine Anfrage gleichzeitig läuft. Externe Nova-Nutzer sind nicht von dieser lokalen Sperre erfasst.

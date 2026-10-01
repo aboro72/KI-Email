@@ -68,6 +68,17 @@ class NovaClient:
             raise RuntimeError("Nova benötigt eine HTTPS-Adresse")
         chat = [{"role": "system", "content": "\n".join(item["text"] for item in system)}]
         chat.extend({"role": item["role"], "content": "\n".join(block["text"] for block in item["content"])} for item in messages)
+        if settings.nova_model == "local":
+            # Qwen auf dem Jetson hat 4096 Tokens Kontext inklusive Ausgabe.
+            # Das Aufgaben-/JSON-Schema steht vorn; lange Website-/Mailtexte
+            # werden hinten gekürzt. Der Bedrock-Pfad bleibt unverändert.
+            budget = max(1000, min(4500, (4096 - inferenceConfig.get("maxTokens", 1024)) * 2))
+            for item in chat:
+                original = item["content"]
+                if len(original) > budget:
+                    marker = "\n[Quelltext wegen begrenztem lokalen Kontext gekürzt.]"
+                    item["content"] = original[:max(0, budget - len(marker))] + marker
+                budget = max(0, budget - len(item["content"]))
         payload = {
             "model": settings.nova_model,
             "messages": chat,
@@ -81,11 +92,11 @@ class NovaClient:
             for attempt in range(max(0, min(3, settings.nova_max_retries)) + 1):
                 try:
                     response = httpx.post(
-                settings.nova_base_url.rstrip("/") + "/chat/completions",
-                headers={"Authorization": "Bearer " + settings.nova_api_key},
-                json=payload,
-                timeout=httpx.Timeout(max(180, settings.nova_request_timeout)),
-                follow_redirects=False,
+                        settings.nova_base_url.rstrip("/") + "/chat/completions",
+                        headers={"Authorization": "Bearer " + settings.nova_api_key},
+                        json=payload,
+                        timeout=httpx.Timeout(max(180, settings.nova_request_timeout)),
+                        follow_redirects=False,
                     )
                 except httpx.TimeoutException:
                     raise RuntimeError("Nova-Zeitlimit erreicht; Anfrage später erneut starten") from None

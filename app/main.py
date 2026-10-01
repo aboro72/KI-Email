@@ -12,11 +12,11 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import delete, func, inspect, or_, select, text
+from sqlalchemy import delete, func, inspect, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db import Base, engine, get_db, initialize_persistence
+from app.db import Base, SessionLocal, engine, get_db, initialize_persistence
 from app.jobs import enqueue
 from app.models import Activity, AuditLog, BackgroundJob, Company, Contact, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
@@ -150,6 +150,7 @@ def research_company_background(company_id: int) -> None:
             company.research_status = "failed"
             company.research_error = str(exc)[:1000]
             db.commit()
+        raise
     finally:
         db.close()
 
@@ -215,7 +216,7 @@ async def lifespan(_: FastAPI):
                 with engine.begin() as connection:
                     connection.execute(text(f"ALTER TABLE tickets ADD COLUMN {name} {definition}"))
     initialize_persistence()
-    with next(get_db()) as db:
+    with SessionLocal() as db:
         permissions = {}
         for name in ROLE_PERMISSIONS:
             permission = db.scalar(select(Permission).where(Permission.name == name))
@@ -720,10 +721,12 @@ def delete_company(company_id: int, request: Request, db: Session = Depends(get_
         return RedirectResponse("/crm/companies?message=Firma+nicht+gefunden", status_code=303)
 
     contact_ids = [contact.id for contact in db.scalars(select(Contact).where(Contact.company_id == company.id)).all()]
+    lead_ids = list(db.scalars(select(Lead.id).where(Lead.company_id == company.id)))
     # Kampagnenhistorien bleiben erhalten; nur die optionale CRM-Verknüpfung wird gelöst.
     if contact_ids:
-        db.execute(delete(MarketingRecipient).where(MarketingRecipient.contact_id.in_(contact_ids)).values(contact_id=None))
-    db.execute(delete(Activity).where(Activity.company_id == company.id))
+        db.execute(update(MarketingRecipient).where(MarketingRecipient.contact_id.in_(contact_ids)).values(contact_id=None))
+        db.execute(update(Lead).where(Lead.contact_id.in_(contact_ids), Lead.company_id != company.id).values(contact_id=None))
+    db.execute(delete(Activity).where(or_(Activity.company_id == company.id, Activity.contact_id.in_(contact_ids), Activity.lead_id.in_(lead_ids))))
     db.execute(delete(Lead).where(Lead.company_id == company.id))
     if contact_ids:
         db.execute(delete(Contact).where(Contact.id.in_(contact_ids)))

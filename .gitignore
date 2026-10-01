@@ -8,3 +8,4 @@ __pycache__/
 .vscode/
 bedrock-long-term-api-key.csv
 ki_email.db
+.nova-request.lock

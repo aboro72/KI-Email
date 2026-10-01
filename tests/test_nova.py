@@ -72,3 +72,14 @@ def test_concurrent_clients_are_serialized(monkeypatch):
         results=list(pool.map(lambda _: nova.NovaClient().converse(modelId="",system=[],messages=[],inferenceConfig={}),range(3)))
     assert len(results)==3
     assert maximum==1
+
+
+def test_local_request_limits_long_sources_and_keeps_schema(monkeypatch):
+    def post(url, **kwargs):
+        chat=kwargs['json']['messages']
+        assert sum(len(item['content']) for item in chat) <= 4500
+        assert chat[-1]['content'].startswith('Erstelle JSON mit summary.')
+        assert 'gekürzt' in chat[-1]['content']
+        return httpx.Response(200,json={'choices':[{'message':{'content':'OK'}}]})
+    monkeypatch.setattr(nova.httpx,'post',post)
+    nova.NovaClient().converse(modelId='',system=[{'text':'System'}],messages=[{'role':'user','content':[{'text':'Erstelle JSON mit summary. '+ 'Quelltext '*4000}]}],inferenceConfig={'maxTokens':1600})
