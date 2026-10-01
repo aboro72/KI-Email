@@ -23,6 +23,11 @@ def _load_api_key() -> str:
 
 
 def _client():
+    if get_settings().ai_provider == "nova":
+        from app.nova import NovaClient
+        return NovaClient()
+    if get_settings().ai_provider != "bedrock":
+        raise RuntimeError("Unbekannter KI-Anbieter")
     api_key = _load_api_key()
     if not api_key:
         raise RuntimeError("Bedrock-API-Key nicht gefunden")

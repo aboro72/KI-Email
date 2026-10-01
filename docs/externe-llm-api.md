@@ -1,6 +1,6 @@
 # Externe LLM-API (Nova)
 
-Stand: 01.10.2026. Vom Benutzer bereitgestellte Schnittstellenbeschreibung; in dieser Sitzung nicht am API-Server überprüft. Als Referenz für eine mögliche AboroDesk-Anbindung gespeichert. Die Anbindung ist noch nicht implementiert.
+Stand: 01.10.2026. Vom Benutzer bereitgestellte Schnittstellenbeschreibung. AboroDesk-Anbindung und aktueller Prüfstand sind im letzten Abschnitt dokumentiert; nicht alle hier beschriebenen Endpunkte und Grenzen wurden separat überprüft.
 
 ## Basis und Authentifizierung
 
@@ -84,4 +84,10 @@ Zugangsdaten und interne Backendfehlermeldungen werden nicht ausgeliefert. Exter
 
 Diese API bietet einen zusätzlichen möglichen KI-Zugang. Der Nova-API-Key ist unabhängig vom direkt in AboroDesk verwendeten Bedrock-Schlüssel. Ein funktionierender Nova-Zugang bestätigt nicht die Gültigkeit des AboroDesk-Bedrock-Schlüssels.
 
-Eine spätere Anbindung benötigt eine eigene Providerkonfiguration und einen Adapter für die bestehenden KI-Aufgaben. Backendwahl (`local` oder `bedrock`) muss ausdrücklich konfiguriert werden; kein stiller Fallback. Noch kein Nova-Key für AboroDesk hinterlegt und keine Serverkonfiguration geändert.
+Am 01.10.2026 wurde die Anbindung in `app/nova.py` implementiert. Die bisherigen E-Mail-, Helpdesk- und Firmen-KI-Aufgaben verwenden bei `AI_PROVIDER=nova` diesen Adapter. Standard ohne Umstellung bleibt `bedrock`.
+
+Auf dem AboroDesk-Server sind `AI_PROVIDER=nova`, `NOVA_BASE_URL=https://ki.ml-projekt.de/v1` und `NOVA_MODEL=local` gesetzt. Der vom Benutzer gelieferte Key wurde ausschließlich in `/etc/aborodesk/aborodesk.env` hinterlegt, nicht im Repository. Anwendung und Worker wurden neu gestartet und sind aktiv.
+
+Die authentifizierte Modellabfrage lieferte HTTP 200 mit `local` und `bedrock`. Generierungstests erhielten bislang HTTP 429 (Kapazität belegt); eine erfolgreiche strukturierte Qwen-Auswertung ist noch nicht bestätigt. Der Adapter gibt verständliche Fehler ohne Zugangsdaten aus. Lokale Tests: 11 bestanden, einschließlich Request-/Antwortabbildung und Fehlerbehandlung.
+
+Rückwechsel nach erfolgreicher Bedrock-Prüfung: `AI_PROVIDER=bedrock` in der Dienstkonfiguration setzen und Anwendung sowie Worker neu starten. Es gibt keinen automatischen Wechsel des Backends.

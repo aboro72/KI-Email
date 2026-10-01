@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     max_attachment_count: int = 10
     max_total_attachment_bytes: int = 25 * 1024 * 1024
     bedrock_region: str = "eu-central-1"
+    ai_provider: str = "bedrock"
+    nova_base_url: str = "https://ki.ml-projekt.de/v1"
+    nova_api_key: str = ""
+    nova_model: str = "local"
     bedrock_model_id: str = "eu.anthropic.claude-sonnet-4-6"
     bedrock_api_key_file: str = "bedrock-long-term-api-key.csv"
     update_status_file: str = "/var/lib/aborodesk-updater/status.json"

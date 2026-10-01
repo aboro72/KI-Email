@@ -4,6 +4,8 @@ Stand: 30.09.2026, Europe/Berlin. Dieses Dokument ist der Einstieg für die näc
 
 ## Ziel und verbindliche Entscheidungen
 
+Aktualisierung 01.10.2026: Auf Wunsch des Benutzers wurde Nova/Qwen vorübergehend aktiviert (`AI_PROVIDER=nova`, `NOVA_MODEL=local`). Adapter `app/nova.py` bedient die bisherigen KI-Aufgaben; Schlüssel nur in der Serverkonfiguration. Authentifizierte Modellabfrage erfolgreich (HTTP 200); Generierung bisher durch HTTP 429 blockiert. Details und Rückwechsel in `docs/externe-llm-api.md`. Die nachfolgende ältere Aussage „noch nicht implementiert“ beschreibt den Stand vor dieser Umstellung.
+
 Nachtrag vom 01.10.2026: Die vom Benutzer bereitgestellte Nova-Schnittstelle ist in [externe-llm-api.md](externe-llm-api.md) dokumentiert. Basis `https://ki.ml-projekt.de/v1`, Bearer-Authentifizierung mit eigenem Nova-Key, explizite Backends `local` (Qwen) und `bedrock`. Diese zusätzliche KI-Anbindung ist noch nicht implementiert. Der direkte AboroDesk-Bedrock-Test vom 01.10.2026 konnte die Schlüsseldatei lesen, wurde von AWS aber mit 403 / `AccessDeniedException` und „Authentication failed: Please make sure your API Key is valid.“ abgelehnt.
 
 - AboroDesk soll Arbeit erleichtern und wiederkehrende Abläufe automatisieren.
