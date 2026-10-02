@@ -15,6 +15,19 @@ Die Anwendung und Datenbank sollten nicht direkt aus dem öffentlichen ISPConfig
 
 ## Installation
 
+### Geführte Installation (empfohlen)
+
+Im Projektstamm startet ein zweisprachiger Assistent. Er fragt Administrator-Zugang, MongoDB, globale Sprache, ISPConfig-Webbenutzer und Port ab und ruft anschließend das vorhandene Installationsskript auf:
+
+```bash
+cd /web/app
+sudo python3 deploy/install.py
+```
+
+Die gewählte Sprache gilt für alle Benutzer und kann später unter **Administration → Globale Sprache** geändert werden.
+
+### Manuelle Installation
+
 Vor der Installation die Zielumgebung prüfen:
 
 ```bash

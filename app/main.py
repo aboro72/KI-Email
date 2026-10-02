@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, func, inspect, or_, select, text, update
@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine, get_db, initialize_persistence
 from app.jobs import enqueue
-from app.models import Activity, AuditLog, BackgroundJob, Company, Contact, Contract, DashboardPreference, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, Task, Ticket, TicketComment, User, user_email_accounts
+from app.models import Activity, AuditLog, BackgroundJob, Company, Contact, Contract, DashboardPreference, Draft, EmailAccount, EmailMessage, EmailReply, HelpdeskCategory, KnowledgeArticle, Lead, MarketingCampaign, MarketingRecipient, Notification, OutgoingEmail, Permission, Role, SystemSetting, Task, Ticket, TicketComment, User, user_email_accounts
 from app.policy import approve_draft, send_draft
 from app.prospect_scoring import score_products
 from app.research_presentation import present_research
@@ -239,6 +239,10 @@ async def lifespan(_: FastAPI):
                     connection.execute(text(f"ALTER TABLE tickets ADD COLUMN {name} {definition}"))
     initialize_persistence()
     with SessionLocal() as db:
+        if not db.get(SystemSetting, "ui_language"):
+            language = get_settings().ui_language.lower()
+            db.add(SystemSetting(key="ui_language", value=language if language in {"de", "en"} else "de"))
+            db.commit()
         permissions = {}
         for name in ROLE_PERMISSIONS:
             permission = db.scalar(select(Permission).where(Permission.name == name))
@@ -366,6 +370,14 @@ def user_help(request: Request, db: Session = Depends(get_db)):
 def health():
     # Ein kleiner Endpunkt für Docker, Monitoring und den schnellen Funktionstest.
     return {"status": "ok", "service": get_settings().app_name}
+
+
+@app.get("/ui-language.js")
+def ui_language_script(db: Session = Depends(get_db)):
+    setting = db.get(SystemSetting, "ui_language")
+    language = setting.value if setting and setting.value in {"de", "en"} else "de"
+    return Response(f'window.ABORODESK_LANGUAGE="{language}";', media_type="application/javascript",
+                    headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -552,7 +564,24 @@ def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     role_count = db.scalar(select(func.count()).select_from(Role)) or 0
     account_count = db.scalar(select(func.count()).select_from(EmailAccount)) or 0
     logs = db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(8)).all()
-    return templates.TemplateResponse(request=request, name="admin.html", context={"user": user, "user_count": user_count, "role_count": role_count, "account_count": account_count, "logs": logs, "message": request.query_params.get("message")})
+    language_setting = db.get(SystemSetting, "ui_language")
+    return templates.TemplateResponse(request=request, name="admin.html", context={"user": user, "user_count": user_count, "role_count": role_count, "account_count": account_count, "logs": logs, "ui_language": language_setting.value if language_setting else "de", "message": request.query_params.get("message")})
+
+
+@app.post("/admin/language")
+def admin_language(request: Request, language: str = Form(...), db: Session = Depends(get_db)):
+    user = require_user(request, db)
+    require_permission(user, "ADMIN_SETTINGS")
+    if language not in {"de", "en"}:
+        raise HTTPException(400, "Ungültige Sprache / Invalid language")
+    setting = db.get(SystemSetting, "ui_language") or SystemSetting(key="ui_language")
+    setting.value = language
+    db.add(setting)
+    db.add(AuditLog(action="system.language_changed", actor_user_id=user.id,
+                    details=json.dumps({"language": language})))
+    db.commit()
+    message = "Sprache gespeichert" if language == "de" else "Language saved"
+    return RedirectResponse(f"/admin?message={message.replace(' ', '+')}", status_code=303)
 
 
 @app.get("/admin/users", response_class=HTMLResponse)

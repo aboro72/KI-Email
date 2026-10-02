@@ -14,6 +14,9 @@ SERVICE_USER="${SERVICE_USER:-www-data}"
 SERVICE_GROUP="${SERVICE_GROUP:-${SERVICE_USER}}"
 APP_PORT="${APP_PORT:-8001}"
 MONGODB_URI="${MONGODB_URI:-}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-change-me-now}"
+UI_LANGUAGE="${UI_LANGUAGE:-de}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # FTP-Layout des ISPConfig-Projekts: /web/app enthält app/, requirements.txt usw.
 # SOURCE_DIR kann für ein anderes Layout weiterhin überschrieben werden.
@@ -66,8 +69,9 @@ APP_NAME=${APP_NAME}
 ENVIRONMENT=production
 DATABASE_URL=${MONGODB_URI}
 SECRET_KEY=${SECRET_KEY}
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=change-me-now
+ADMIN_EMAIL=${ADMIN_EMAIL}
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
+UI_LANGUAGE=${UI_LANGUAGE}
 SESSION_COOKIE_SECURE=true
 BEDROCK_REGION=eu-central-1
 BEDROCK_MODEL_ID=eu.anthropic.claude-sonnet-4-6

@@ -49,10 +49,13 @@ Die technische Analyse steht in [docs/architecture.md](docs/architecture.md). Be
 
 ## Linux-Installation
 
+- [Geführtes Installationsprogramm](deploy/install.py): als root mit `python3 deploy/install.py` starten; fragt Installationsart, globale Sprache, Administrator, MongoDB und Serverdaten ab.
 - [ISPConfig3-Installation](deploy/ispconfig3/installation.md) mit [Installationsskript](deploy/ispconfig3/install.sh)
 - [Einzelserver-Installation](deploy/single-server/installation.md) mit [Installationsskript](deploy/single-server/install.sh)
 
 Die Skripte kopieren keine lokale Datenbank und keine API-Key-Datei. Zugangsdaten werden erst auf dem Zielserver über eine geschützte Environment-Datei bzw. ein Secret-Management hinterlegt.
+
+Die Benutzeroberfläche unterstützt Deutsch und Englisch. Die Administration legt die Sprache unter **Administration → Globale Sprache** einmal für die gesamte Einzelinstallation fest; Benutzer können keine abweichende Sprache wählen.
 
 ## MongoDB-Migration
 

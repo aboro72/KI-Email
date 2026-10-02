@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     cloudshare_password: str = ""
     cloudshare_folder_id: int = 0
     contracts_cloudshare_folder_id: int = 0
+    ui_language: str = "de"
     cloudshare_timeout: float = 60
     documents_max_bytes: int = 25 * 1024 * 1024
     office_base_url: str = "https://office.aborosoft.com"

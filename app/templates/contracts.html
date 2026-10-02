@@ -1,4 +1,4 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verträge · AboroDesk</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/contracts.css"></head><body>
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verträge · AboroDesk</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/contracts.css"><script src="/ui-language.js" defer></script><script src="/static/i18n-catalog.js?v=20261002" defer></script><script src="/static/i18n.js?v=20261002" defer></script></head><body>
 <header><a class="brand" href="/dashboard">AboroDesk</a>{% include '_grouped_nav.html' %}</header><main class="shell">
 <div class="intro"><div><span class="eyebrow">Optionales Modul</span><h1>Vertragsverwaltung</h1><p>Verträge, Dokumente, Fristen und KI-Prüfhinweise an einem Ort.</p></div>{% if can_manage %}<a class="button" href="/contracts/new">Vertrag anlegen</a>{% endif %}</div>
 {% if message %}<p class="success-notice">{{ message }}</p>{% endif %}

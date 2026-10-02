@@ -48,4 +48,4 @@ Die CloudShare-Zugangsdaten bleiben identisch mit der allgemeinen Dateiablage. D
 
 ## Prüfung
 
-Die lokale Testsuite umfasst nun 76 Tests. Sie prüft unter anderem Rechte, Modulabschaltung, Fristberechnung, Erinnerungen, getrennte Dokumentzuordnung, Upload/Download, KI-Warteschlange und persönliche Schnellzugriffe.
+Die lokale Testsuite umfasst nun 79 Tests. Sie prüft unter anderem Rechte, Modulabschaltung, Fristberechnung, Erinnerungen, getrennte Dokumentzuordnung, Upload/Download, KI-Warteschlange, persönliche Schnellzugriffe und die globale Spracheinstellung.

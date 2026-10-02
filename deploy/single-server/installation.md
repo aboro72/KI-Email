@@ -12,7 +12,16 @@ Diese Variante richtet einen einzelnen Debian-/Ubuntu-Server mit Python, Nginx u
 
 Das Skript installiert keinen Datenbankserver. Die Anwendung verwendet die konfigurierte MongoDB als dauerhafte Persistenz.
 
-## Installation
+## Geführte Installation (empfohlen)
+
+```bash
+cd /pfad/zum/AboroDesk-Projekt
+sudo python3 deploy/install.py
+```
+
+Der zweisprachige Assistent fragt Serverart, Domain, TLS, Administrator-Zugang, MongoDB und die globale Sprache ab. Die Sprache gilt für alle Benutzer und kann später in der Administration geändert werden.
+
+## Manuelle Installation
 
 Vor der Installation die Zielumgebung prüfen:
 
