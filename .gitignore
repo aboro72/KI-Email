@@ -10,3 +10,7 @@ bedrock-long-term-api-key.csv
 ki_email.db
 .nova-request.lock
 .project-planning.lock
+.hrm.lock
+.erp.lock
+tmp/pdfs/
+tmp/backups/

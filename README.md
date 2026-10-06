@@ -39,6 +39,14 @@ Der Fortschritt wird in [STATUS.md](STATUS.md) fortgeschrieben.
 
 Die modulare Vertragsverwaltung ist in [docs/VERTRAGSVERWALTUNG-2026-10-01.md](docs/VERTRAGSVERWALTUNG-2026-10-01.md) dokumentiert. Sie verwaltet Vertragsdaten, geschützte CloudShare-Dokumente, Fristen, Erinnerungen und ausdrücklich überprüfungspflichtige KI-Hinweise.
 
+## Personalmanagement
+
+Das optionale HRM-Modul unter `/hrm` verwaltet Mitarbeiter, Urlaubsanträge, geschützte Onboarding-Aufgaben, Personalunterlagen und zugeordnete Arbeitsverträge. Personalunterlagen benötigen einen eigenen privaten CloudShare-Ordner und zusätzliche Modulrechte. Einrichtung, Rechte und Umfang sind in [docs/HRM-2026-10-06.md](docs/HRM-2026-10-06.md) beschrieben.
+
+## ERP / Rechnungen
+
+Das optionale Modul unter `/erp` verwaltet Kunden, Artikel, Angebote, Aufträge, PDF-Rechnungen, Zahlungen und Stornobelege. Rechnungen werden ausdrücklich freigegeben und anschließend unverändert gespeichert. Einrichtung und Grenzen: [docs/ERP-2026-10-06.md](docs/ERP-2026-10-06.md).
+
 ## Tests
 
 ```powershell

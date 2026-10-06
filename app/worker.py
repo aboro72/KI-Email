@@ -32,6 +32,19 @@ def main() -> None:
                 jobs = run_pending(db, limit=10)
                 for job in jobs:
                     logging.info("Job %s (%s): %s", job.id, job.job_type, job.status)
+            from app.config import get_settings
+            if get_settings().hrm_enabled:
+                from app.hrm import remind_onboarding
+                from app.hrm_db import hrm_db
+                for db in hrm_db():
+                    remind_onboarding(db)
+                    db.commit()
+            if get_settings().erp_enabled:
+                from app.erp import remind_overdue
+                from app.erp_db import erp_db
+                for db in erp_db():
+                    remind_overdue(db)
+                    db.commit()
         except Exception as exc:
             logging.error("Worker-Zyklus fehlgeschlagen: %s", type(exc).__name__)
         time.sleep(interval)

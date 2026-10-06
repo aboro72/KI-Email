@@ -25,6 +25,9 @@ from app.research_presentation import present_research
 from app.projects import router as projects_router
 from app.documents import router as documents_router
 from app.contracts import router as contracts_router
+from app.hrm import router as hrm_router, visible_employees
+from app.hrm_records import router as hrm_records_router
+from app.erp import router as erp_router
 from app.prospect_criteria import load_criteria, DEFAULTS, exclusion_reason, germany_evidence, website_evidence
 from app.models import ProspectSearchSettings
 from app.security import create_session, csrf_matches, current_user, decrypt_secret, encrypt_secret, hash_password, new_csrf_token, rate_limiter, require_permission, require_user, verify_password
@@ -48,6 +51,16 @@ def _available_email_accounts(user: User, db: Session) -> list[EmailAccount]:
     return [account for account in user.email_accounts if account.is_active]
 
 ROLE_PERMISSIONS = {
+    "ERP_VIEW": "Kaufmännische Belege und Stammdaten lesen",
+    "ERP_MANAGE": "Kunden, Artikel, Angebote und Aufträge verwalten",
+    "ERP_APPROVE": "Rechnungen freigeben und stornieren",
+    "ERP_PAYMENTS": "Zahlungseingänge erfassen",
+    "ERP_EXPORT": "Kaufmännische Belege exportieren",
+    "HRM_DOCUMENTS_VIEW": "Personalunterlagen und freigegebene eigene Arbeitsverträge lesen",
+    "HRM_DOCUMENTS_MANAGE": "Personalunterlagen und Arbeitsvertragszuordnungen verwalten",
+    "HRM_VIEW": "Personalbereich und eigene Anträge benutzen",
+    "HRM_MANAGE": "Mitarbeiter und Onboarding verwalten",
+    "HRM_APPROVE": "Urlaubsanträge zugeordneter Mitarbeiter entscheiden",
     "DOCUMENTS_VIEW": "Gemeinsame Dateiablage lesen",
     "DOCUMENTS_UPLOAD": "Dateien in die gemeinsame Ablage hochladen",
     "DOCUMENTS_EDIT": "Dokumente online bearbeiten",
@@ -278,9 +291,14 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title=get_settings().app_name, lifespan=lifespan)
+app.state.hrm_enabled = lambda: get_settings().hrm_enabled
+app.state.erp_enabled = lambda: get_settings().erp_enabled
 app.include_router(projects_router)
 app.include_router(documents_router)
 app.include_router(contracts_router)
+app.include_router(hrm_router)
+app.include_router(hrm_records_router)
+app.include_router(erp_router)
 
 
 def _browser_error(request: Request, status_code: int, message: str):
@@ -414,6 +432,8 @@ def _dashboard_shortcuts(user: User) -> list[dict[str, str]]:
         ("inbox", "Posteingang", "/inbox", True),
         ("compose", "Neue E-Mail", "/compose", "EMAIL_SEND" in permissions),
         ("tasks", "Aufgaben", "/tasks", True),
+        ("hrm", "Personal", "/hrm", settings.hrm_enabled and "HRM_VIEW" in permissions),
+        ("erp", "ERP / Rechnungen", "/erp", settings.erp_enabled and "ERP_VIEW" in permissions),
         ("search", "Suche", "/search", True),
         ("crm", "CRM", "/crm", "CRM_MANAGE" in permissions),
         ("helpdesk", "Helpdesk", "/helpdesk", "HELPDESK_VIEW" in permissions),
@@ -549,8 +569,17 @@ def global_search(request: Request, q: str = "", db: Session = Depends(get_db)):
         for item in db.scalars(select(KnowledgeArticle).where(or_(KnowledgeArticle.title.ilike(term), KnowledgeArticle.summary.ilike(term), KnowledgeArticle.content.ilike(term), KnowledgeArticle.keywords.ilike(term))).limit(10)).all():
             results.append({"kind": "Wissensartikel", "title": item.title, "detail": item.product, "url": "/helpdesk/knowledge"})
         permissions = {permission.name for permission in user.role.permissions}
+        if get_settings().hrm_enabled and "HRM_VIEW" in permissions:
+            from app.models import Employee
+            for item in db.scalars(visible_employees(user).where(or_(Employee.name.ilike(term), Employee.personnel_number.ilike(term))).limit(10)):
+                results.append({"kind": "Mitarbeiter", "title": item.name, "detail": item.department, "url": "/hrm"})
+        if get_settings().erp_enabled and "ERP_VIEW" in permissions:
+            from app.models import CommercialDocument
+            for item in db.scalars(select(CommercialDocument).where(or_(CommercialDocument.title.ilike(term), CommercialDocument.number.ilike(term))).limit(10)):
+                results.append({"kind": "ERP-Beleg", "title": item.number or item.title, "detail": item.title, "url": f"/erp/documents/{item.id}"})
         if get_settings().contracts_enabled and "CONTRACT_VIEW" in permissions:
-            for item in db.scalars(select(Contract).where(or_(Contract.title.ilike(term), Contract.contract_number.ilike(term), Contract.counterparty.ilike(term), Contract.description.ilike(term))).limit(10)).all():
+            from app.personnel_access import visible_contracts
+            for item in db.scalars(visible_contracts(user).where(or_(Contract.title.ilike(term), Contract.contract_number.ilike(term), Contract.counterparty.ilike(term), Contract.description.ilike(term))).limit(10)).all():
                 results.append({"kind": "Vertrag", "title": item.title, "detail": item.counterparty or item.contract_number, "url": f"/contracts/{item.id}"})
     return templates.TemplateResponse(request=request, name="search.html", context={"user": user, "query": query, "results": results})
 

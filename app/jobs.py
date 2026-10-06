@@ -91,8 +91,14 @@ def run_pending(db: Session, *, limit: int = 10, stale_after_seconds: int = 900)
         contract = db.get(Contract, reminder.contract_id)
         if not contract:
             continue
+        if contract.contract_type == "personal":
+            from app.models import User
+            from app.personnel_access import can_read_personnel, has
+            owner = db.get(User, contract.owner_user_id)
+            if not owner or not owner.is_active or not can_read_personnel(owner) or not has(owner, "CONTRACT_VIEW"):
+                continue
         db.add(Notification(user_id=contract.owner_user_id, title="Vertragsfrist beachten",
-                            message=f"{contract.title}: {reminder.title} bis {reminder.due_date}",
+                            message="Details im geschützten Personalbereich." if contract.contract_type == "personal" else f"{contract.title}: {reminder.title} bis {reminder.due_date}",
                             url=f"/contracts/{contract.id}"))
         reminder.notification_sent_at = now
     if due_contract_reminders:

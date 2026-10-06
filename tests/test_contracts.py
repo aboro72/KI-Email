@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 import app.contracts as contracts_module
 from app.config import get_settings
 from app.db import Base, get_db
+from app.hrm_db import hrm_db
 from app.main import app
 from app.models import Contract, ContractReminder, DashboardPreference, Permission, Role, User
 from app.security import create_session
@@ -34,6 +35,7 @@ def contract_env(monkeypatch):
             yield db
 
     app.dependency_overrides[get_db] = database
+    app.dependency_overrides[hrm_db] = database
     monkeypatch.setattr(get_settings(), "contracts_enabled", True)
     fake_storage = SimpleNamespace(
         upload=lambda *args: {"id": 501},
@@ -47,6 +49,7 @@ def contract_env(monkeypatch):
     yield SimpleNamespace(client=client, engine=engine, queued=queued)
     client.close()
     app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(hrm_db, None)
     engine.dispose()
 
 

@@ -10,6 +10,10 @@ AboroDesk ist eine Einzelkundenlösung: Jede Installation gehört zu einem Kunde
 
 ## Bereits umgesetzt
 
+- Kaufmännisches ERP-Grundmodul mit Kunden-/Artikelstammdaten, Angeboten, Aufträgen, freizugebenden PDF-Rechnungen, festen Belegständen, Storno, Teilzahlungen, Zahlungskorrekturen, Erinnerungen und CSV-Belegregister; [Einrichtung und Grenzen](ERP-2026-10-06.md). Strukturierte E-Rechnungen und Finanzbuchhaltung sind noch offen.
+
+- HRM mit Mitarbeiterstammdaten, zuständigkeitsgebundenen Urlaubsanträgen, geschütztem Onboarding, Personalunterlagen in separater CloudShare-Ablage und Arbeitsvertragszuordnung mit ausdrücklicher Mitarbeiterfreigabe; [Einrichtung und Grenzen](HRM-2026-10-06.md).
+
 - E-Mail-Postfächer, Posteingang, Entwürfe und Versandfreigabe
 - KI-Vorschläge mit menschlicher Prüfung; kein stiller automatischer Versand
 - CRM mit Firmen, Kontakten, Leads, Aktivitäten und Website-Recherche

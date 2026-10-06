@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine, event, inspect, select
+from sqlalchemy import create_engine, event, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -128,8 +128,36 @@ def reserve_mongo_ids(session, flush_context, instances):
 SessionLocal = sessionmaker(bind=engine, class_=PersistenceSession, autoflush=False, autocommit=False)
 
 
+def migrate_erp_schema(database_engine=None) -> None:
+    """Add fields introduced after the first ERP release without replacing tables."""
+    target = database_engine if database_engine is not None else engine
+    if target.dialect.name != "sqlite":
+        return
+    additions = {
+        "erp_documents": {
+            "issued_pdf_base64": "TEXT NOT NULL DEFAULT ''",
+            "overdue_notified_at": "DATETIME",
+        },
+        "erp_payments": {
+            "reverses_payment_id": "INTEGER REFERENCES erp_payments(id)",
+        },
+    }
+    with target.begin() as connection:
+        tables = set(inspect(connection).get_table_names())
+        for table, definitions in additions.items():
+            if table not in tables:
+                continue
+            columns = {column["name"] for column in inspect(connection).get_columns(table)}
+            for name, definition in definitions.items():
+                if name not in columns:
+                    connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {definition}"))
+        if "erp_payments" in tables:
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_erp_payment_reversal ON erp_payments (reverses_payment_id)"))
+
+
 def initialize_persistence() -> None:
     if mongo_store is None:
+        migrate_erp_schema()
         return
     # Eigenständige Prozesse (Worker, CLI, Kandidatensuche) besitzen jeweils
     # ihre eigene In-Memory-SQLite-Arbeitsdatenbank. Sie muss vor dem Import

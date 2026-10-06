@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     project_lock_file: str = ".project-planning.lock"
     documents_enabled: bool = False
     contracts_enabled: bool = True
+    hrm_enabled: bool = True
+    erp_enabled: bool = True
+    erp_lock_file: str = ".erp.lock"
+    hrm_lock_file: str = ".hrm.lock"
+    hrm_cloudshare_folder_id: int = 0
     cloudshare_base_url: str = "https://cloudshare.aborosoft.com"
     cloudshare_username: str = ""
     cloudshare_password: str = ""

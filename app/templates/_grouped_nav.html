@@ -7,6 +7,8 @@
 {% set nav_contracts = can_contracts if can_contracts is defined else 'CONTRACT_VIEW' in permission_names %}
 <nav class="grouped-nav" aria-label="Hauptnavigation">
   <a href="/dashboard">Dashboard</a>
+  {% if user is defined and request.app.state.hrm_enabled() and 'HRM_VIEW' in permission_names %}<a href="/hrm">Personal</a>{% endif %}
+  {% if user is defined and request.app.state.erp_enabled() and 'ERP_VIEW' in permission_names %}<a href="/erp">ERP / Rechnungen</a>{% endif %}
   <details class="nav-group">
     <summary>Arbeit</summary>
     <div class="nav-dropdown">

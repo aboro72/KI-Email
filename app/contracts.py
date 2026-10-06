@@ -13,9 +13,10 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.cloudshare import StorageError, contract_storage_client
+from app.cloudshare import StorageError, contract_storage_client, hrm_storage_client
+from app.personnel_access import can_read_personnel, visible_contracts
 from app.config import get_settings
-from app.db import get_db
+from app.hrm_db import hrm_db as get_db
 from app.jobs import enqueue
 from app.models import AuditLog, Company, Contract, ContractDocument, ContractReminder, User
 from app.security import require_permission, require_user
@@ -38,14 +39,19 @@ def actor(request, db, manage=False, ai=False):
     require_permission(user, "CONTRACT_VIEW")
     if manage:
         require_permission(user, "CONTRACT_MANAGE")
+        contract = db.get(Contract, request.path_params.get("contract_id")) if request.path_params.get("contract_id") else None
+        if contract and contract.contract_type == "personal":
+            if not can_read_personnel(user):
+                raise HTTPException(404, "Vertrag nicht gefunden.")
+            require_permission(user, "HRM_DOCUMENTS_MANAGE")
     if ai:
         require_permission(user, "CONTRACT_AI")
     return user
 
 
-def contract_or_404(db, contract_id):
+def contract_or_404(db, contract_id, user):
     contract = db.get(Contract, contract_id)
-    if not contract:
+    if not contract or (contract.contract_type == "personal" and not can_read_personnel(user)):
         raise HTTPException(404, "Vertrag nicht gefunden.")
     return contract
 
@@ -75,9 +81,9 @@ def _audit(db, user, action, contract_id, **details):
     db.add(AuditLog(action=action, actor_user_id=user.id, details=json.dumps({"contract_id": contract_id, **details}, ensure_ascii=False)))
 
 
-def _storage(operation):
+def _storage(operation, contract=None):
     try:
-        return operation(contract_storage_client())
+        return operation(hrm_storage_client() if contract and contract.contract_type == "personal" else contract_storage_client())
     except StorageError as exc:
         raise HTTPException(502, str(exc)) from None
 
@@ -92,9 +98,10 @@ def _analysis_result(contract):
 
 def render(request, name, user, **context):
     permissions = _permissions(user)
-    return templates.TemplateResponse(request=request, name=name, context={
-        "user": user, "statuses": STATUSES, "types": TYPES,
-        "can_manage": "CONTRACT_MANAGE" in permissions,
+    personal = bool(context.get("contract") and context["contract"].contract_type == "personal")
+    return templates.TemplateResponse(request=request, name=name, headers={"Cache-Control": "no-store"}, context={
+        "user": user, "statuses": STATUSES, "types": TYPES if can_read_personnel(user) else {k: v for k, v in TYPES.items() if k != "personal"},
+        "can_manage": "CONTRACT_MANAGE" in permissions and (not personal or "HRM_DOCUMENTS_MANAGE" in permissions),
         "can_ai": "CONTRACT_AI" in permissions,
         "can_crm": "CRM_MANAGE" in permissions,
         "can_helpdesk": "HELPDESK_VIEW" in permissions,
@@ -108,7 +115,13 @@ def render(request, name, user, **context):
 
 def _apply_form(contract, *, title, contract_number, company_id, counterparty, contract_type, status,
                 owner_user_id, start_date, end_date, notice_period_days, auto_renew, renewal_months,
-                description, analysis_text, db):
+                description, analysis_text, db, user):
+    if contract_type == "personal" or contract.contract_type == "personal":
+        if not can_read_personnel(user):
+            raise HTTPException(403, "Personalunterlagen sind nicht freigegeben")
+        require_permission(user, "HRM_DOCUMENTS_MANAGE")
+        if contract.contract_type == "personal" and contract_type != "personal":
+            raise HTTPException(409, "Personalvertr?ge d?rfen nicht in allgemeine Vertr?ge umgewandelt werden")
     contract.title = text(title, 240, "Titel", required=True)
     contract.contract_number = text(contract_number, 100, "Vertragsnummer")
     contract.company_id = company_id or None
@@ -120,6 +133,8 @@ def _apply_form(contract, *, title, contract_number, company_id, counterparty, c
     owner = db.get(User, owner_user_id)
     if not owner or not owner.is_active:
         raise HTTPException(400, "Die verantwortliche Person ist nicht verfügbar.")
+    if contract.contract_type == "personal" and (not can_read_personnel(owner) or "CONTRACT_VIEW" not in _permissions(owner)):
+        raise HTTPException(400, "Verantwortliche für Personalverträge benötigen Zugriff auf Personalunterlagen und Verträge.")
     contract.owner_user_id = owner.id
     contract.start_date = parsed_date(start_date, "Vertragsbeginn")
     contract.end_date = parsed_date(end_date, "Vertragsende")
@@ -150,7 +165,7 @@ def _sync_deadline_reminder(db, contract, user_id):
 @router.get("", response_class=HTMLResponse)
 def index(request: Request, q: str = "", status: str = "", db: Session = Depends(get_db)):
     user = actor(request, db)
-    statement = select(Contract).order_by(Contract.end_date == "", Contract.end_date, Contract.title)
+    statement = visible_contracts(user).order_by(Contract.end_date == "", Contract.end_date, Contract.title)
     if q.strip():
         term = f"%{q.strip()}%"
         statement = statement.where(or_(Contract.title.ilike(term), Contract.contract_number.ilike(term), Contract.counterparty.ilike(term)))
@@ -181,7 +196,7 @@ def create(request: Request, title: str = Form(...), contract_number: str = Form
                 counterparty=counterparty, contract_type=contract_type, status=status,
                 owner_user_id=owner_user_id, start_date=start_date, end_date=end_date,
                 notice_period_days=notice_period_days, auto_renew=auto_renew,
-                renewal_months=renewal_months, description=description, analysis_text=analysis_text, db=db)
+                renewal_months=renewal_months, description=description, analysis_text=analysis_text, db=db, user=user)
     db.add(contract)
     db.flush()
     _sync_deadline_reminder(db, contract, user.id)
@@ -193,7 +208,7 @@ def create(request: Request, title: str = Form(...), contract_number: str = Form
 @router.get("/{contract_id}", response_class=HTMLResponse)
 def detail(contract_id: int, request: Request, db: Session = Depends(get_db)):
     user = actor(request, db)
-    contract = contract_or_404(db, contract_id)
+    contract = contract_or_404(db, contract_id, user)
     documents = db.scalars(select(ContractDocument).where(ContractDocument.contract_id == contract.id).order_by(ContractDocument.created_at.desc())).all()
     reminders = db.scalars(select(ContractReminder).where(ContractReminder.contract_id == contract.id).order_by(ContractReminder.completed_at.is_not(None), ContractReminder.due_date)).all()
     return render(request, "contract_detail.html", user, contract=contract, documents=documents,
@@ -204,7 +219,7 @@ def detail(contract_id: int, request: Request, db: Session = Depends(get_db)):
 @router.get("/{contract_id}/edit", response_class=HTMLResponse)
 def edit_form(contract_id: int, request: Request, db: Session = Depends(get_db)):
     user = actor(request, db, manage=True)
-    return render(request, "contract_form.html", user, contract=contract_or_404(db, contract_id),
+    return render(request, "contract_form.html", user, contract=contract_or_404(db, contract_id, user),
                   companies=db.scalars(select(Company).order_by(Company.name)).all(),
                   users=db.scalars(select(User).where(User.is_active).order_by(User.display_name)).all())
 
@@ -217,14 +232,14 @@ def update(contract_id: int, request: Request, revision: int = Form(...), title:
            auto_renew: str = Form(""), renewal_months: int = Form(0), description: str = Form(""),
            analysis_text: str = Form(""), db: Session = Depends(get_db)):
     user = actor(request, db, manage=True)
-    contract = contract_or_404(db, contract_id)
+    contract = contract_or_404(db, contract_id, user)
     if contract.revision != revision:
         raise HTTPException(409, "Der Vertrag wurde zwischenzeitlich geändert. Bitte neu laden.")
     _apply_form(contract, title=title, contract_number=contract_number, company_id=company_id,
                 counterparty=counterparty, contract_type=contract_type, status=status,
                 owner_user_id=owner_user_id, start_date=start_date, end_date=end_date,
                 notice_period_days=notice_period_days, auto_renew=auto_renew,
-                renewal_months=renewal_months, description=description, analysis_text=analysis_text, db=db)
+                renewal_months=renewal_months, description=description, analysis_text=analysis_text, db=db, user=user)
     contract.revision += 1
     _sync_deadline_reminder(db, contract, user.id)
     _audit(db, user, "contract.updated", contract.id, revision=contract.revision)
@@ -236,7 +251,7 @@ def update(contract_id: int, request: Request, revision: int = Form(...), title:
 def add_reminder(contract_id: int, request: Request, title: str = Form(...), due_date: str = Form(...),
                  remind_date: str = Form(...), db: Session = Depends(get_db)):
     user = actor(request, db, manage=True)
-    contract = contract_or_404(db, contract_id)
+    contract = contract_or_404(db, contract_id, user)
     due, remind = parsed_date(due_date, "Fälligkeit", True), parsed_date(remind_date, "Erinnerungsdatum", True)
     if remind > due:
         raise HTTPException(400, "Das Erinnerungsdatum darf nicht nach der Fälligkeit liegen.")
@@ -250,7 +265,7 @@ def add_reminder(contract_id: int, request: Request, title: str = Form(...), due
 @router.post("/{contract_id}/reminders/{reminder_id}/complete")
 def complete_reminder(contract_id: int, reminder_id: int, request: Request, db: Session = Depends(get_db)):
     user = actor(request, db, manage=True)
-    contract_or_404(db, contract_id)
+    contract_or_404(db, contract_id, user)
     reminder = db.get(ContractReminder, reminder_id)
     if not reminder or reminder.contract_id != contract_id:
         raise HTTPException(404, "Erinnerung nicht gefunden.")
@@ -275,15 +290,14 @@ def _extract_text(filename, content):
 
 
 @router.post("/{contract_id}/documents")
-async def upload_document(contract_id: int, request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+def upload_document(contract_id: int, request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
     user = actor(request, db, manage=True)
-    contract = contract_or_404(db, contract_id)
+    contract = contract_or_404(db, contract_id, user)
     try:
-        content = await file.read(get_settings().documents_max_bytes + 1)
+        content = file.file.read(get_settings().documents_max_bytes + 1)
     finally:
-        await file.close()
-    from starlette.concurrency import run_in_threadpool
-    uploaded = await run_in_threadpool(_storage, lambda client: client.upload(file.filename or "", content, file.content_type))
+        file.file.close()
+    uploaded = _storage(lambda client: client.upload(file.filename or "", content, file.content_type), contract)
     cloud_id = int(uploaded.get("id", 0))
     if cloud_id <= 0:
         raise HTTPException(502, "CloudShare lieferte keine gültige Datei-ID.")
@@ -307,10 +321,10 @@ def _mapped_document(db, contract_id, document_id):
 
 @router.get("/{contract_id}/documents/{document_id}/download")
 def download_document(contract_id: int, document_id: int, request: Request, db: Session = Depends(get_db)):
-    actor(request, db)
-    contract_or_404(db, contract_id)
+    user = actor(request, db)
+    contract = contract_or_404(db, contract_id, user)
     document = _mapped_document(db, contract_id, document_id)
-    info, content = _storage(lambda client: client.download(document.cloudshare_file_id))
+    info, content = _storage(lambda client: client.download(document.cloudshare_file_id), contract)
     filename = quote(str(info.get("name", document.filename)), safe="")
     return Response(content, media_type="application/octet-stream", headers={
         "Content-Disposition": "attachment; filename*=UTF-8''" + filename,
@@ -321,8 +335,9 @@ def download_document(contract_id: int, document_id: int, request: Request, db: 
 @router.post("/{contract_id}/documents/{document_id}/office")
 def office_document(contract_id: int, document_id: int, request: Request, db: Session = Depends(get_db)):
     user = actor(request, db, manage=True)
+    contract = contract_or_404(db, contract_id, user)
     document = _mapped_document(db, contract_id, document_id)
-    url = _storage(lambda client: client.office(document.cloudshare_file_id))
+    url = _storage(lambda client: client.office(document.cloudshare_file_id), contract)
     _audit(db, user, "contract.document_office", contract_id, cloudshare_file_id=document.cloudshare_file_id)
     db.commit()
     return RedirectResponse(url, status_code=303, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
@@ -331,7 +346,7 @@ def office_document(contract_id: int, document_id: int, request: Request, db: Se
 @router.post("/{contract_id}/ai")
 def request_ai(contract_id: int, request: Request, db: Session = Depends(get_db)):
     user = actor(request, db, ai=True)
-    contract = contract_or_404(db, contract_id)
+    contract = contract_or_404(db, contract_id, user)
     if not contract.analysis_text.strip():
         raise HTTPException(400, "Für die KI-Prüfung wird ein auslesbares Dokument oder ein Prüftext benötigt.")
     if contract.ai_status in {"pending", "running"}:

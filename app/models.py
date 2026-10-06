@@ -506,3 +506,125 @@ class ContractReminder(Base):
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     contract: Mapped[Contract] = relationship(back_populates="reminders")
+
+
+class Employee(Base):
+    __tablename__ = "hrm_employees"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    personnel_number: Mapped[str] = mapped_column(String(80), unique=True)
+    name: Mapped[str] = mapped_column(String(160))
+    department: Mapped[str] = mapped_column(String(160), default="")
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, unique=True)
+    manager_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    start_date: Mapped[str] = mapped_column(String(10))
+    end_date: Mapped[str] = mapped_column(String(10), default="")
+
+
+class LeaveRequest(Base):
+    __tablename__ = "hrm_leave_requests"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("hrm_employees.id"), index=True)
+    start_date: Mapped[str] = mapped_column(String(10))
+    end_date: Mapped[str] = mapped_column(String(10))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    decided_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OnboardingTask(Base):
+    __tablename__ = "hrm_onboarding_tasks"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("hrm_employees.id"), index=True)
+    title: Mapped[str] = mapped_column(String(240))
+    assigned_to_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    due_date: Mapped[str] = mapped_column(String(10))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PersonnelDocument(Base):
+    __tablename__ = "hrm_documents"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("hrm_employees.id"), index=True)
+    cloudshare_file_id: Mapped[int] = mapped_column(unique=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    shared_with_employee: Mapped[bool] = mapped_column(Boolean, default=False)
+    uploaded_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class EmployeeContract(Base):
+    __tablename__ = "hrm_employee_contracts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("hrm_employees.id"), index=True)
+    contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.id"), unique=True)
+    shared_with_employee: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ErpCustomer(Base):
+    __tablename__ = "erp_customers"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_number: Mapped[str] = mapped_column(String(80), unique=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, unique=True)
+    name: Mapped[str] = mapped_column(String(240))
+    address: Mapped[str] = mapped_column(Text)
+    email: Mapped[str] = mapped_column(String(320), default="")
+    vat_id: Mapped[str] = mapped_column(String(80), default="")
+    payment_days: Mapped[int] = mapped_column(default=14)
+
+
+class ErpItem(Base):
+    __tablename__ = "erp_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sku: Mapped[str] = mapped_column(String(80), unique=True)
+    name: Mapped[str] = mapped_column(String(240))
+    unit: Mapped[str] = mapped_column(String(40), default="Stück")
+    price_cents: Mapped[int] = mapped_column(default=0)
+    tax_basis_points: Mapped[int] = mapped_column(default=1900)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class CommercialDocument(Base):
+    __tablename__ = "erp_documents"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("erp_customers.id"), index=True)
+    source_document_id: Mapped[int | None] = mapped_column(ForeignKey("erp_documents.id"), nullable=True, unique=True)
+    number: Mapped[str | None] = mapped_column(String(80), nullable=True, unique=True)
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    title: Mapped[str] = mapped_column(String(240))
+    customer_json: Mapped[str] = mapped_column(Text, default="{}")
+    issuer_json: Mapped[str] = mapped_column(Text, default="{}")
+    lines_json: Mapped[str] = mapped_column(Text, default="[]")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    issued_pdf_base64: Mapped[str] = mapped_column(Text, default="")
+    overdue_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    service_date: Mapped[str] = mapped_column(String(10), default="")
+    valid_until: Mapped[str] = mapped_column(String(10), default="")
+    payment_days: Mapped[int] = mapped_column(default=14)
+    due_date: Mapped[str] = mapped_column(String(10), default="", index=True)
+    net_cents: Mapped[int] = mapped_column(default=0)
+    tax_cents: Mapped[int] = mapped_column(default=0)
+    total_cents: Mapped[int] = mapped_column(default=0)
+    revision: Mapped[int] = mapped_column(default=1)
+    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    approved_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ErpSequence(Base):
+    __tablename__ = "erp_sequences"
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    value: Mapped[int] = mapped_column(default=0)
+
+
+class ErpPayment(Base):
+    __tablename__ = "erp_payments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("erp_documents.id"), index=True)
+    amount_cents: Mapped[int] = mapped_column()
+    paid_date: Mapped[str] = mapped_column(String(10))
+    reference: Mapped[str] = mapped_column(String(240), default="")
+    reverses_payment_id: Mapped[int | None] = mapped_column(ForeignKey("erp_payments.id"), nullable=True, unique=True)
+    recorded_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))

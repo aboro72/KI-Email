@@ -83,6 +83,30 @@
     "Aktion nicht möglich":"Action not possible", "Erneut versuchen":"Try again", "Liste aktualisieren":"Refresh list"
   };
   Object.assign(translations, window.ABORODESK_TRANSLATIONS || {});
+  translations["ERP / Rechnungen"] = "ERP / Invoices";
+  Object.assign(translations, {
+    "Personal":"Personnel", "Personalmanagement":"Personnel management",
+    "Mitarbeiter, Urlaub und Onboarding":"Employees, leave and onboarding",
+    "Mitarbeiter":"Employees", "Meine Anträge":"My requests", "Personalnummer":"Personnel number",
+    "Abteilung":"Department", "Ohne Zugang":"No login", "Führungskraft":"Manager",
+    "Eintritt":"Employment start", "Austritt":"Employment end", "Mitarbeiter anlegen":"Add employee",
+    "Keine Mitarbeiter zugeordnet.":"No employees assigned.", "Urlaubsanträge":"Leave requests",
+    "Von":"From", "Bis":"To", "Urlaub beantragen":"Request leave", "Offen":"Pending",
+    "Genehmigt":"Approved", "Abgelehnt":"Rejected", "Genehmigen":"Approve", "Ablehnen":"Reject",
+    "Keine Urlaubsanträge vorhanden.":"No leave requests yet.", "Aufgabe":"Task",
+    "Verantwortlich":"Responsible", "Fällig am":"Due on", "Aufgabe anlegen":"Add task",
+    "Überfällig":"Overdue", "Erledigen":"Complete", "Keine Onboarding-Aufgaben vorhanden.":"No onboarding tasks yet."
+  });
+  Object.assign(translations, {
+    "Personalakte":"Personnel file", "Personalunterlagen":"Personnel documents",
+    "Für Mitarbeiter freigeben":"Share with employee", "Freigabe speichern":"Save sharing",
+    "Maximale Dateigröße":"Maximum file size", "Arbeitsverträge":"Employment contracts",
+    "Arbeitsvertrag anlegen":"Create employment contract", "Bestehenden Personalvertrag zuordnen":"Link existing employment contract",
+    "Zuordnen":"Link", "Vertrag verwalten":"Manage contract",
+    "Keine freigegebenen Personalunterlagen vorhanden.":"No shared personnel documents available.",
+    "Keine freigegebenen Arbeitsverträge vorhanden.":"No shared employment contracts available.",
+    "Die Vertragsfreigabe umfasst die Vertragsdaten und alle zugehörigen Vertragsdokumente.":"Sharing a contract includes its details and all associated contract documents."
+  });
 
   const replacements = [
     [/^Guten Tag,\s*/i, "Hello, "], [/^Noch keine\s+/i, "No "], [/^Zurück zu\s+/i, "Back to "],

@@ -28,6 +28,9 @@ class CloudShareClient:
         self.folder_id = self.settings.cloudshare_folder_id if folder_id is None else folder_id
         if not self.settings.cloudshare_username or not self.settings.cloudshare_password or self.folder_id <= 0:
             raise StorageError("CloudShare-Zugang und Ablageordner müssen eingerichtet werden.")
+        hrm_folder = getattr(self.settings, "hrm_cloudshare_folder_id", 0)
+        if hrm_folder > 0 and hrm_folder in {self.settings.cloudshare_folder_id, getattr(self.settings, "contracts_cloudshare_folder_id", 0)}:
+            raise StorageError("Der Personalordner muss von allgemeiner Dateiablage und Vertragsablage getrennt sein.")
         self.http = httpx.Client(base_url=self.base_url, timeout=max(10, self.settings.cloudshare_timeout),
                                  follow_redirects=False, transport=transport)
         self._token = ""
@@ -151,3 +154,8 @@ def storage_client():
 @lru_cache(maxsize=1)
 def contract_storage_client():
     return CloudShareClient(folder_id=get_settings().contracts_cloudshare_folder_id)
+
+
+@lru_cache(maxsize=1)
+def hrm_storage_client():
+    return CloudShareClient(folder_id=get_settings().hrm_cloudshare_folder_id)
