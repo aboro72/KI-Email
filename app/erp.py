@@ -1,10 +1,11 @@
 """ERP (Enterprise Resource Planning) Modul - Geschäftsprozesse."""
-from datetime import date
+from datetime import date, datetime, timezone
+import json
 from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -299,3 +300,158 @@ def sync_paypal_transactions(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(f"/erp/paypal?message={quote(f'{count} Transaktionen synchronisiert')}", status_code=303)
     except Exception as e:
         return RedirectResponse(f"/erp/paypal?message={quote(f'Fehler: {str(e)}')}", status_code=303)
+
+
+@router.post("/paypal/webhook")
+async def paypal_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    PayPal Webhook-Empfänger für Echtzeit-Zahlungsbenachrichtigungen.
+
+    Dieser Endpunkt empfängt Benachrichtigungen von PayPal bei:
+    - PAYMENT.CAPTURE.COMPLETED (Zahlung erfolgreich)
+    - PAYMENT.SALE.COMPLETED (Verkauf abgeschlossen)
+
+    URL für PayPal: https://desk.aborosoft.com/erp/paypal/webhook
+    """
+    try:
+        # Webhook-Daten als JSON parsen
+        body = await request.body()
+        webhook_event = json.loads(body.decode('utf-8'))
+
+        # PayPal-Signatur-Header auslesen
+        transmission_id = request.headers.get("Paypal-Transmission-Id", "")
+        timestamp = request.headers.get("Paypal-Transmission-Time", "")
+        cert_url = request.headers.get("Paypal-Cert-Url", "")
+        actual_signature = request.headers.get("Paypal-Transmission-Sig", "")
+
+        # Config laden
+        config = db.scalar(select(PayPalConfig).limit(1))
+        if not config or not config.enabled:
+            return JSONResponse({"error": "PayPal not configured"}, status_code=400)
+
+        # Signatur verifizieren (wenn Webhook ID konfiguriert)
+        if config.webhook_id and transmission_id:
+            from app.paypal_integration import verify_webhook_signature
+
+            is_valid = verify_webhook_signature(
+                config.webhook_id,
+                transmission_id,
+                timestamp,
+                webhook_event,
+                cert_url,
+                actual_signature,
+                config
+            )
+
+            if not is_valid:
+                return JSONResponse({"error": "Invalid signature"}, status_code=401)
+
+        # Event-Typ prüfen
+        event_type = webhook_event.get("event_type", "")
+
+        # Nur Zahlungs-Events verarbeiten
+        if event_type not in ["PAYMENT.CAPTURE.COMPLETED", "PAYMENT.SALE.COMPLETED"]:
+            return JSONResponse({"status": "ignored", "event_type": event_type})
+
+        # Transaktionsdaten extrahieren
+        resource = webhook_event.get("resource", {})
+
+        # Transaction ID
+        tx_id = resource.get("id", "")
+        if not tx_id:
+            return JSONResponse({"error": "No transaction ID"}, status_code=400)
+
+        # Prüfe ob bereits vorhanden
+        existing = db.scalar(select(PayPalTransaction).where(PayPalTransaction.transaction_id == tx_id))
+        if existing:
+            return JSONResponse({"status": "already_processed", "transaction_id": tx_id})
+
+        # Betrag extrahieren
+        amount_info = resource.get("amount", {})
+        amount_value = float(amount_info.get("value", 0))
+        amount_cents = int(amount_value * 100)
+        currency = amount_info.get("currency_code", "EUR")
+
+        # Gebühren (falls vorhanden)
+        seller_receivable = resource.get("seller_receivable_breakdown", {})
+        fee_info = seller_receivable.get("paypal_fee", {})
+        fee_value = float(fee_info.get("value", 0))
+        fee_cents = int(abs(fee_value) * 100)
+        net_cents = amount_cents - fee_cents
+
+        # Payer-Info
+        payer = resource.get("payer", {})
+        payer_email = payer.get("email_address", "")
+        payer_name_obj = payer.get("name", {})
+        payer_full_name = f"{payer_name_obj.get('given_name', '')} {payer_name_obj.get('surname', '')}".strip()
+
+        # Status
+        status = resource.get("status", "COMPLETED")
+
+        # Datum
+        create_time = resource.get("create_time") or resource.get("update_time")
+        if create_time:
+            tx_date = datetime.fromisoformat(create_time.replace("Z", "+00:00"))
+        else:
+            tx_date = datetime.now(timezone.utc)
+
+        # Notiz/Beschreibung
+        note = resource.get("invoice_id", "") or resource.get("custom_id", "")
+
+        # Transaktion speichern
+        transaction = PayPalTransaction(
+            transaction_id=tx_id,
+            transaction_type=event_type,
+            transaction_status=status,
+            transaction_amount_cents=amount_cents,
+            transaction_currency=currency,
+            fee_amount_cents=fee_cents,
+            net_amount_cents=net_cents,
+            payer_email=payer_email,
+            payer_name=payer_full_name,
+            transaction_date=tx_date,
+            transaction_note=note,
+            raw_data=json.dumps(webhook_event),
+            synced_at=datetime.now(timezone.utc),
+            processed=False,  # Wird später für automatische Lizenzvergabe verwendet
+        )
+
+        db.add(transaction)
+
+        # Audit-Log
+        db.add(AuditLog(
+            action="PAYPAL_WEBHOOK_RECEIVED",
+            actor_user_id=1,  # System
+            details=json.dumps({
+                "event_type": event_type,
+                "transaction_id": tx_id,
+                "amount": amount_value,
+                "currency": currency,
+                "payer": payer_email
+            })
+        ))
+
+        db.commit()
+
+        # TODO: Hier später automatische Lizenzvergabe hinzufügen
+        # if note contains product SKU -> create license -> send email
+
+        return JSONResponse({
+            "status": "success",
+            "transaction_id": tx_id,
+            "amount": amount_value,
+            "currency": currency,
+            "processed": False
+        })
+
+    except json.JSONDecodeError:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    except Exception as e:
+        # Log error but return 200 to PayPal to avoid retries
+        db.add(AuditLog(
+            action="PAYPAL_WEBHOOK_ERROR",
+            actor_user_id=1,
+            details=json.dumps({"error": str(e)})
+        ))
+        db.commit()
+        return JSONResponse({"error": str(e)}, status_code=500)

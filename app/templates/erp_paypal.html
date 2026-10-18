@@ -158,21 +158,53 @@
         {% endif %}
 
         <section class="panel">
+            <h2>🔔 Webhook einrichten (Empfohlen!)</h2>
+            <p style="margin-bottom: 1rem;">
+                <strong>Webhooks ermöglichen Echtzeit-Benachrichtigungen bei Zahlungseingängen.</strong>
+                Zahlungen werden sofort im System erfasst, ohne manuelle Synchronisierung.
+            </p>
+
+            <div style="background: #f5f5f5; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+                <strong>Deine Webhook-URL:</strong><br>
+                <code style="background: white; padding: 0.5rem; display: inline-block; margin-top: 0.5rem; font-size: 0.9rem;">
+                    https://desk.aborosoft.com/erp/paypal/webhook
+                </code>
+            </div>
+
+            <ol style="line-height: 1.8;">
+                <li>Gehe zu <a href="https://developer.paypal.com/dashboard" target="_blank">developer.paypal.com/dashboard</a></li>
+                <li>Wähle deine App "ABoroDesk ERP Live"</li>
+                <li>Scrolle zu <strong>"Webhooks"</strong> und klicke auf <strong>"Add Webhook"</strong></li>
+                <li>Webhook URL: <code>https://desk.aborosoft.com/erp/paypal/webhook</code></li>
+                <li>Wähle die Event-Typen aus:
+                    <ul style="margin-top: 0.5rem;">
+                        <li><strong>PAYMENT.CAPTURE.COMPLETED</strong> ✓</li>
+                        <li><strong>PAYMENT.SALE.COMPLETED</strong> ✓</li>
+                    </ul>
+                </li>
+                <li>Klicke auf <strong>"Save"</strong></li>
+                <li>Kopiere die <strong>Webhook ID</strong> und trage sie oben in der Konfiguration ein</li>
+            </ol>
+
+            <p style="margin-top: 1rem; color: #2e7d32;">
+                <strong>✓ Vorteil:</strong> Bei jeder PayPal-Zahlung wird sofort eine Benachrichtigung an ABoroDesk gesendet.
+                Später können automatisch Lizenzen erstellt und verschickt werden!
+            </p>
+        </section>
+
+        <section class="panel">
             <h2>Anleitung: PayPal API-Credentials erstellen</h2>
             <ol style="line-height: 1.8;">
                 <li>Gehe zu <a href="https://developer.paypal.com/dashboard" target="_blank">developer.paypal.com/dashboard</a></li>
                 <li>Melde dich mit deinem PayPal-Konto an</li>
                 <li>Klicke auf "Apps & Credentials"</li>
-                <li>Wähle "Sandbox" für Tests oder "Live" für Produktion</li>
+                <li>Wähle "Live" (nicht Sandbox)</li>
                 <li>Klicke auf "Create App"</li>
-                <li>Gib einen App-Namen ein (z.B. "ABoroDesk ERP")</li>
+                <li>Gib einen App-Namen ein (z.B. "ABoroDesk ERP Live")</li>
+                <li>Aktiviere unter <strong>"Features"</strong> die Option <strong>"Transaction search"</strong></li>
                 <li>Kopiere die <strong>Client ID</strong> und das <strong>Secret</strong></li>
                 <li>Füge die Credentials oben im Formular ein</li>
             </ol>
-            <p style="margin-top: 1rem;">
-                <strong>Hinweis:</strong> Für automatische Lizenzvergebung können später Webhooks eingerichtet werden.
-                Diese benachrichtigen das System sofort bei Zahlungseingängen.
-            </p>
         </section>
     </main>
 </body>
