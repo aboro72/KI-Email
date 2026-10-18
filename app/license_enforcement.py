@@ -122,11 +122,13 @@ def is_license_required_path(path: str) -> bool:
     - /license (Lizenz-Eingabe)
     - /license/activate (Lizenz aktivieren)
     - /license/validate (Lizenz validieren via API)
+    - /health (Health-Check für Monitoring)
     - /static/* (CSS, JS, Bilder)
     - /favicon.ico
     """
     # Pfade, die ohne Lizenz zugänglich sind
     allowed_paths = [
+        "/health",
         "/license",
         "/license/",
         "/license/activate",
