@@ -295,9 +295,17 @@ def sync_paypal_transactions(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/erp/paypal?message=PayPal+nicht+konfiguriert", status_code=303)
 
     try:
-        from app.paypal_integration import fetch_transactions
+        from app.paypal_integration import fetch_transactions, PayPalAPIError
         count = fetch_transactions(config, db)
         return RedirectResponse(f"/erp/paypal?message={quote(f'{count} Transaktionen synchronisiert')}", status_code=303)
+    except PayPalAPIError as e:
+        error_msg = str(e)
+        if "NOT_AUTHORIZED" in error_msg or "insufficient permissions" in error_msg:
+            return RedirectResponse(
+                f"/erp/paypal?message={quote('⚠️ PayPal Transaction Search API nicht verfügbar. Bitte richte Webhooks ein für automatische Synchronisierung!')}",
+                status_code=303
+            )
+        return RedirectResponse(f"/erp/paypal?message={quote(f'PayPal-Fehler: {error_msg}')}", status_code=303)
     except Exception as e:
         return RedirectResponse(f"/erp/paypal?message={quote(f'Fehler: {str(e)}')}", status_code=303)
 
