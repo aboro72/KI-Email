@@ -336,17 +336,22 @@ def _same_origin(request: Request) -> bool:
 async def request_protection(request: Request, call_next):
     csrf_cookie = request.cookies.get("ki_email_csrf")
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-        client = request.client.host if request.client else "unknown"
-        limit, window = _rate_limit_for(request.url.path)
-        if not rate_limiter.allow(f"{client}:{request.url.path}", limit, window):
-            return _browser_error(request, 429, "Zu viele Anfragen. Bitte versuche es später erneut.")
-        # Formular-Bodies werden hier absichtlich nicht gelesen: Andernfalls
-        # stünde der Upload-/Form-Parser der eigentlichen Route kein zweites
-        # Mal zur Verfügung. Browser-Formulare werden strikt per Origin
-        # geprüft; API-Clients können zusätzlich den Header verwenden.
-        submitted = request.headers.get("x-csrf-token")
-        if not csrf_matches(submitted, csrf_cookie) and not _same_origin(request):
-            return _browser_error(request, 403, "Die Sitzung konnte nicht bestätigt werden. Bitte Seite neu laden und erneut versuchen.")
+        # Webhooks von externen Diensten (PayPal, etc.) vom CSRF-Schutz ausnehmen
+        webhook_paths = ["/erp/paypal/webhook"]
+        is_webhook = any(request.url.path == path for path in webhook_paths)
+
+        if not is_webhook:
+            client = request.client.host if request.client else "unknown"
+            limit, window = _rate_limit_for(request.url.path)
+            if not rate_limiter.allow(f"{client}:{request.url.path}", limit, window):
+                return _browser_error(request, 429, "Zu viele Anfragen. Bitte versuche es später erneut.")
+            # Formular-Bodies werden hier absichtlich nicht gelesen: Andernfalls
+            # stünde der Upload-/Form-Parser der eigentlichen Route kein zweites
+            # Mal zur Verfügung. Browser-Formulare werden strikt per Origin
+            # geprüft; API-Clients können zusätzlich den Header verwenden.
+            submitted = request.headers.get("x-csrf-token")
+            if not csrf_matches(submitted, csrf_cookie) and not _same_origin(request):
+                return _browser_error(request, 403, "Die Sitzung konnte nicht bestätigt werden. Bitte Seite neu laden und erneut versuchen.")
     response = await call_next(request)
     if not csrf_cookie:
         response.set_cookie(
