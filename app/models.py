@@ -680,7 +680,7 @@ class License(Base):
     paypal_transaction_id: Mapped[int | None] = mapped_column(ForeignKey("paypal_transactions.id"), nullable=True)
     erp_document_id: Mapped[int | None] = mapped_column(ForeignKey("erp_documents.id"), nullable=True)
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    metadata: Mapped[str] = mapped_column(Text, default="{}")
+    custom_data: Mapped[str] = mapped_column(Text, default="{}")
 
 
 class LicenseActivation(Base):
