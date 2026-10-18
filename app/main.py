@@ -1416,6 +1416,69 @@ def test_email_account(account_id: int, request: Request, db: Session = Depends(
     return RedirectResponse(f"/admin/email-accounts?message={quote(message)}", status_code=303)
 
 
+@app.post("/admin/email-accounts/{account_id}/toggle")
+def toggle_email_account(account_id: int, request: Request, db: Session = Depends(get_db)):
+    """Aktiviert oder deaktiviert ein E-Mail-Konto."""
+    from urllib.parse import quote
+
+    user = require_user(request, db)
+    require_permission(user, "ADMIN_SETTINGS")
+    account = db.get(EmailAccount, account_id)
+    if not account:
+        return RedirectResponse("/admin/email-accounts?message=Konto+nicht+gefunden", status_code=303)
+
+    account.is_active = not account.is_active
+    status = "aktiviert" if account.is_active else "deaktiviert"
+    db.add(AuditLog(action="EMAIL_ACCOUNT_TOGGLED", actor_user_id=user.id, details=f'{{"email": "{account.email_address}", "active": {str(account.is_active).lower()}}}'))
+    db.commit()
+    message = f"E-Mail-Konto {account.email_address} wurde {status}"
+    return RedirectResponse(f"/admin/email-accounts?message={quote(message)}", status_code=303)
+
+
+@app.post("/admin/email-accounts/{account_id}")
+def update_email_account(
+    account_id: int,
+    request: Request,
+    account_name: str = Form(...),
+    email_address: str = Form(...),
+    display_name: str = Form(...),
+    imap_host: str = Form(...),
+    imap_port: int = Form(...),
+    smtp_host: str = Form(...),
+    smtp_port: int = Form(...),
+    username: str = Form(...),
+    password: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Aktualisiert ein bestehendes E-Mail-Konto."""
+    from urllib.parse import quote
+    from app.security import encrypt_secret
+
+    user = require_user(request, db)
+    require_permission(user, "ADMIN_SETTINGS")
+    account = db.get(EmailAccount, account_id)
+    if not account:
+        return RedirectResponse("/admin/email-accounts?message=Konto+nicht+gefunden", status_code=303)
+
+    account.account_name = account_name
+    account.email_address = email_address.strip().lower()
+    account.display_name = display_name
+    account.imap_host = imap_host
+    account.imap_port = imap_port
+    account.smtp_host = smtp_host
+    account.smtp_port = smtp_port
+    account.username = username
+
+    # Passwort nur aktualisieren, wenn ein neues eingegeben wurde
+    if password:
+        account.encrypted_password = encrypt_secret(password)
+
+    db.add(AuditLog(action="EMAIL_ACCOUNT_UPDATED", actor_user_id=user.id, details=f'{{"email": "{account.email_address}"}}'))
+    db.commit()
+    message = f"E-Mail-Konto {account.email_address} wurde aktualisiert"
+    return RedirectResponse(f"/admin/email-accounts?message={quote(message)}", status_code=303)
+
+
 @app.post("/admin/email-accounts")
 def create_email_account(
     request: Request,
