@@ -14,3 +14,4 @@ ki_email.db
 .erp.lock
 tmp/pdfs/
 tmp/backups/
+.license.json
