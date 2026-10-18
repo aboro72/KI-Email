@@ -1766,7 +1766,8 @@ def debug_license_db(db: Session = Depends(get_db)):
     """Debug-Endpunkt um DB-Status zu prüfen."""
     from sqlalchemy import func, text
     from app.models import License
-    from app.db import engine
+    from app.db import engine as global_engine, MONGO_BACKEND, mongo_store
+    from app.config import get_settings
 
     # Zähle Lizenzen
     count = db.scalar(select(func.count(License.id)))
@@ -1776,11 +1777,15 @@ def debug_license_db(db: Session = Depends(get_db)):
     license_keys = [lic.license_key for lic in licenses]
 
     # DB Info
-    db_url = str(engine.url)
+    db_engine = db.get_bind()
+    settings = get_settings()
 
     return JSONResponse({
-        "database_url": db_url,
+        "settings_database_url": settings.database_url,
+        "global_engine_url": str(global_engine.url),
+        "session_engine_url": str(db_engine.url),
+        "mongo_backend": MONGO_BACKEND,
+        "mongo_store_active": mongo_store is not None,
         "license_count": count,
         "license_keys": license_keys,
-        "engine_type": str(type(engine)),
     })
