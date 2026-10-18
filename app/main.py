@@ -333,6 +333,20 @@ def _same_origin(request: Request) -> bool:
 
 
 @app.middleware("http")
+async def license_check(request: Request, call_next):
+    """Lizenz-Prüfung: Blockiert alle Funktionen ohne gültige Lizenz."""
+    from app.license_enforcement import check_license_middleware
+
+    # Prüfe Lizenz
+    license_redirect = check_license_middleware(request)
+    if license_redirect:
+        return license_redirect
+
+    # Lizenz OK: Weiter zur nächsten Middleware
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def request_protection(request: Request, call_next):
     csrf_cookie = request.cookies.get("ki_email_csrf")
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
@@ -1672,3 +1686,68 @@ def send(draft_id: int, request: Request, db: Session = Depends(get_db)):
     if draft:
         send_draft(db, draft, user.id)
     return RedirectResponse("/dashboard", status_code=303)
+
+
+# ===== LIZENZ-VERWALTUNG =====
+
+
+@app.get("/license", response_class=HTMLResponse)
+def license_page(request: Request, message: str = "", error: str = ""):
+    """Lizenz-Eingabe-Seite (einzige Seite ohne Lizenz zugänglich)."""
+    from app.license_enforcement import get_license_page_html
+
+    return get_license_page_html(message=message, error=error)
+
+
+@app.post("/license/activate")
+async def activate_license_local(request: Request, db: Session = Depends(get_db)):
+    """Aktiviert eine Lizenz lokal durch Validierung gegen die zentrale Datenbank."""
+    from urllib.parse import quote
+
+    from app.license_enforcement import save_local_license
+    from app.license_manager import validate_license
+
+    # Form-Daten parsen
+    form = await request.form()
+    license_key = form.get("license_key", "").strip().upper()
+
+    if not license_key:
+        return RedirectResponse(f"/license?error={quote('Bitte Lizenzschlüssel eingeben')}", status_code=303)
+
+    # Produkt-SKU ermitteln
+    from app.license_enforcement import get_product_sku
+
+    product_sku = get_product_sku()
+
+    # Lizenz gegen zentrale Datenbank validieren
+    validation = validate_license(db, license_key, product_sku)
+
+    if not validation["valid"]:
+        reason = validation.get("reason", "Unbekannter Fehler")
+        return RedirectResponse(f"/license?error={quote(f'Lizenz ungültig: {reason}')}", status_code=303)
+
+    # Lizenz ist gültig: Lokal speichern
+    license_data = {
+        "license_key": license_key,
+        "product_sku": product_sku,
+        "customer_name": validation["customer_name"],
+        "customer_email": validation["customer_email"],
+        "valid_until": validation["valid_until"],
+        "max_users": validation["max_users"],
+        "status": "active",
+        "activated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    save_local_license(license_data)
+
+    # Zur Hauptanwendung weiterleiten
+    return RedirectResponse("/dashboard?message=" + quote("Lizenz erfolgreich aktiviert!"), status_code=303)
+
+
+@app.get("/license/validate")
+def validate_license_api(request: Request):
+    """API-Endpunkt zur Lizenzvalidierung (für externe Aufrufe)."""
+    from app.license_enforcement import validate_local_license
+
+    validation = validate_local_license()
+    return JSONResponse(validation)
