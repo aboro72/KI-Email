@@ -125,7 +125,9 @@ def reserve_mongo_ids(session, flush_context, instances):
             item.id = mongo_store.allocate_id(table)
 
 
-SessionLocal = sessionmaker(bind=engine, class_=PersistenceSession, autoflush=False, autocommit=False)
+# Temporär PersistenceSession deaktiviert wegen Lizenz-DB-Problem
+# SessionLocal = sessionmaker(bind=engine, class_=PersistenceSession, autoflush=False, autocommit=False)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 def migrate_erp_schema(database_engine=None) -> None:
