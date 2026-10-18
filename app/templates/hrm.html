@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Personal · AboroDesk</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/ui-language.js" defer></script>
+    <script src="/static/i18n-catalog.js?v=20261002" defer></script>
+    <script src="/static/i18n.js?v=20261002" defer></script>
+</head>
+<body>
+    <header>
+        <a class="brand" href="/dashboard">AboroDesk</a>
+        {% include '_grouped_nav.html' %}
+    </header>
+    <main class="shell">
+        <div class="intro">
+            <div>
+                <span class="eyebrow">Personalverwaltung</span>
+                <h1>Personal</h1>
+                <p>Übersicht über Mitarbeiter, Urlaubsanträge und Onboarding.</p>
+            </div>
+        </div>
+
+        <section class="panel">
+            <div class="panel-title">
+                <h2>Mitarbeiter</h2>
+                <span class="pill">{{ employees|length }} Mitarbeiter</span>
+            </div>
+            {% if employees %}
+                {% for employee in employees %}
+                    <div class="log">
+                        <span>
+                            <strong>{{ employee.name }}</strong>
+                            <br>
+                            <small>Personalnummer: {{ employee.personnel_number }}</small>
+                            {% if employee.department %}
+                                <br><small>Abteilung: {{ employee.department }}</small>
+                            {% endif %}
+                            <br>
+                            <small>
+                                Eintrittsdatum: {{ employee.start_date }}
+                                {% if employee.end_date %}
+                                    · Austrittsdatum: {{ employee.end_date }}
+                                {% endif %}
+                            </small>
+                        </span>
+                        <span class="actions">
+                            {% if employee.end_date %}
+                                <span class="pill">Ausgeschieden</span>
+                            {% else %}
+                                <span class="approved">Aktiv</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="muted">Noch keine Mitarbeiter erfasst.</p>
+            {% endif %}
+        </section>
+
+        {% if can_manage and leave_requests %}
+            <section class="panel">
+                <div class="panel-title">
+                    <h2>Offene Urlaubsanträge</h2>
+                    <span class="pill">{{ leave_requests|length }} offen</span>
+                </div>
+                {% for request in leave_requests %}
+                    <div class="log">
+                        <span>
+                            <strong>Urlaubsantrag</strong>
+                            <br>
+                            <small>{{ request.start_date }} bis {{ request.end_date }}</small>
+                        </span>
+                        <span class="actions">
+                            <span class="pill">Ausstehend</span>
+                        </span>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% if can_manage and onboarding_tasks %}
+            <section class="panel">
+                <div class="panel-title">
+                    <h2>Offene Onboarding-Aufgaben</h2>
+                    <span class="pill">{{ onboarding_tasks|length }} offen</span>
+                </div>
+                {% for task in onboarding_tasks %}
+                    <div class="log">
+                        <span>
+                            <strong>{{ task.title }}</strong>
+                            <br>
+                            <small>Fällig: {{ task.due_date }}</small>
+                        </span>
+                        <span class="actions">
+                            <span class="pill">Offen</span>
+                        </span>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+    </main>
+</body>
+</html>
