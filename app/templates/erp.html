@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ERP / Rechnungen · AboroDesk</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/ui-language.js" defer></script>
+    <script src="/static/i18n-catalog.js?v=20261002" defer></script>
+    <script src="/static/i18n.js?v=20261002" defer></script>
+</head>
+<body>
+    <header>
+        <a class="brand" href="/dashboard">AboroDesk</a>
+        {% include '_grouped_nav.html' %}
+    </header>
+    <main class="shell">
+        <div class="intro">
+            <div>
+                <span class="eyebrow">Geschäftsprozesse</span>
+                <h1>ERP / Rechnungen</h1>
+                <p>Übersicht über Rechnungen, Angebote, Kunden und Artikel.</p>
+            </div>
+        </div>
+
+        <section class="panel">
+            <h2>Statistiken</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <div class="log">
+                    <span>
+                        <strong style="font-size: 2rem;">{{ total_customers }}</strong>
+                        <br><small>Kunden</small>
+                    </span>
+                </div>
+                <div class="log">
+                    <span>
+                        <strong style="font-size: 2rem;">{{ total_items }}</strong>
+                        <br><small>Aktive Artikel</small>
+                    </span>
+                </div>
+                <div class="log">
+                    <span>
+                        <strong style="font-size: 2rem;">{{ overdue_invoices|length }}</strong>
+                        <br><small>Überfällige Rechnungen</small>
+                    </span>
+                </div>
+                <div class="log">
+                    <span>
+                        <strong style="font-size: 2rem;">{{ open_invoices|length }}</strong>
+                        <br><small>Offene Rechnungen</small>
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        {% if overdue_invoices %}
+            <section class="panel">
+                <div class="panel-title">
+                    <h2>Überfällige Rechnungen</h2>
+                    <span class="pill" style="background: #d32f2f; color: white;">{{ overdue_invoices|length }} überfällig</span>
+                </div>
+                {% for doc in overdue_invoices %}
+                    <div class="log">
+                        <span>
+                            <strong>{{ doc.number or 'Entwurf' }}</strong> – {{ doc.title }}
+                            <br>
+                            <small>Kunde: {{ doc.customer_json|fromjson|attr('name') if doc.customer_json else 'Unbekannt' }}</small>
+                            <br>
+                            <small>Fällig: {{ doc.due_date }} · Betrag: {{ (doc.total_cents / 100)|round(2) }} €</small>
+                        </span>
+                        <span class="actions">
+                            <span class="pill" style="background: #d32f2f; color: white;">Überfällig</span>
+                        </span>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% if open_invoices %}
+            <section class="panel">
+                <div class="panel-title">
+                    <h2>Offene Rechnungen</h2>
+                    <span class="pill">{{ open_invoices|length }} offen</span>
+                </div>
+                {% for doc in open_invoices[:5] %}
+                    <div class="log">
+                        <span>
+                            <strong>{{ doc.number or 'Entwurf' }}</strong> – {{ doc.title }}
+                            <br>
+                            <small>Fällig: {{ doc.due_date }} · Betrag: {{ (doc.total_cents / 100)|round(2) }} €</small>
+                        </span>
+                        <span class="actions">
+                            <span class="pill">Offen</span>
+                        </span>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% if recent_quotes %}
+            <section class="panel">
+                <div class="panel-title">
+                    <h2>Aktuelle Angebote</h2>
+                    <span class="pill">{{ recent_quotes|length }} Angebote</span>
+                </div>
+                {% for doc in recent_quotes[:5] %}
+                    <div class="log">
+                        <span>
+                            <strong>{{ doc.number or 'Entwurf' }}</strong> – {{ doc.title }}
+                            <br>
+                            <small>Gültig bis: {{ doc.valid_until }} · Betrag: {{ (doc.total_cents / 100)|round(2) }} €</small>
+                        </span>
+                        <span class="actions">
+                            {% if doc.status == 'draft' %}
+                                <span class="pill">Entwurf</span>
+                            {% elif doc.status == 'issued' %}
+                                <span class="approved">Versendet</span>
+                            {% elif doc.status == 'accepted' %}
+                                <span class="approved">Angenommen</span>
+                            {% else %}
+                                <span class="pill">{{ doc.status }}</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% if drafts %}
+            <section class="panel">
+                <div class="panel-title">
+                    <h2>Entwürfe</h2>
+                    <span class="pill">{{ drafts|length }} Entwürfe</span>
+                </div>
+                {% for doc in drafts[:5] %}
+                    <div class="log">
+                        <span>
+                            <strong>{{ doc.title }}</strong>
+                            <br>
+                            <small>
+                                {% if doc.kind == 'invoice' %}Rechnung{% elif doc.kind == 'quote' %}Angebot{% else %}{{ doc.kind }}{% endif %}
+                                · Betrag: {{ (doc.total_cents / 100)|round(2) }} €
+                            </small>
+                        </span>
+                        <span class="actions">
+                            <span class="pill">Entwurf</span>
+                        </span>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% if not open_invoices and not recent_quotes and not drafts %}
+            <section class="panel">
+                <p class="muted">Noch keine Belege erfasst.</p>
+            </section>
+        {% endif %}
+    </main>
+</body>
+</html>
