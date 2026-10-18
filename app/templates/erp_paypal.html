@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>PayPal-Integration · ERP</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/ui-language.js" defer></script>
+    <script src="/static/i18n-catalog.js?v=20261002" defer></script>
+    <script src="/static/i18n.js?v=20261002" defer></script>
+</head>
+<body>
+    <header>
+        <a class="brand" href="/dashboard">AboroDesk</a>
+        {% include '_grouped_nav.html' %}
+    </header>
+    <main class="shell">
+        {% if message %}
+            <section class="notice">{{ message }}</section>
+        {% endif %}
+
+        <div class="intro">
+            <div>
+                <span class="eyebrow">ERP · PayPal</span>
+                <h1>PayPal-Integration</h1>
+                <p>Überwache Zahlungseingänge und -ausgänge, synchronisiere Transaktionen automatisch.</p>
+            </div>
+            <div>
+                <a class="button" href="/erp">← Zurück zur ERP-Übersicht</a>
+            </div>
+        </div>
+
+        <section class="panel">
+            <h2>Statistiken</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <div class="log">
+                    <span>
+                        <strong style="font-size: 2rem; color: #2e7d32;">+{{ total_received_euros|round(2) }} €</strong>
+                        <br><small>Eingänge</small>
+                    </span>
+                </div>
+                <div class="log">
+                    <span>
+                        <strong style="font-size: 2rem; color: #d32f2f;">{{ total_sent_euros|round(2) }} €</strong>
+                        <br><small>Ausgänge</small>
+                    </span>
+                </div>
+                <div class="log">
+                    <span>
+                        <strong style="font-size: 2rem;">{{ balance_euros|round(2) }} €</strong>
+                        <br><small>Saldo</small>
+                    </span>
+                </div>
+                <div class="log">
+                    <span>
+                        <strong style="font-size: 2rem;">{{ unprocessed_count }}</strong>
+                        <br><small>Unverarbeitet</small>
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-title">
+                <h2>PayPal-Konfiguration</h2>
+                {% if config.enabled %}
+                    <span class="approved">Aktiv</span>
+                {% else %}
+                    <span class="pill">Inaktiv</span>
+                {% endif %}
+            </div>
+            <form method="post" action="/erp/paypal/config" class="account-form">
+                <label>
+                    Umgebung
+                    <select name="environment" required>
+                        <option value="sandbox"{% if config.environment == 'sandbox' %} selected{% endif %}>Sandbox (Test)</option>
+                        <option value="live"{% if config.environment == 'live' %} selected{% endif %}>Live (Produktion)</option>
+                    </select>
+                    <small class="muted">Verwende Sandbox für Tests, Live für echte Transaktionen</small>
+                </label>
+                <label>
+                    Client ID
+                    <input name="client_id" value="{{ config.client_id }}" required>
+                    <small class="muted">Aus dem PayPal Developer Dashboard: <a href="https://developer.paypal.com/dashboard" target="_blank">developer.paypal.com/dashboard</a></small>
+                </label>
+                <label>
+                    Client Secret
+                    <input name="client_secret" type="password" placeholder="Nur bei Änderung eingeben">
+                    <small class="muted">Wird verschlüsselt gespeichert, nur bei Änderung eingeben</small>
+                </label>
+                <label>
+                    Webhook ID <small>(optional)</small>
+                    <input name="webhook_id" value="{{ config.webhook_id }}">
+                    <small class="muted">Für automatische Benachrichtigungen bei neuen Zahlungen</small>
+                </label>
+                <label class="check">
+                    <input type="checkbox" name="enabled" value="true"{% if config.enabled %} checked{% endif %}>
+                    PayPal-Integration aktivieren
+                </label>
+                <button class="button">Konfiguration speichern</button>
+            </form>
+
+            {% if config.last_sync %}
+                <p style="margin-top: 1rem;">
+                    <small class="muted">Letzte Synchronisierung: {{ config.last_sync.strftime('%d.%m.%Y %H:%M') }} Uhr</small>
+                </p>
+            {% endif %}
+
+            {% if config.enabled %}
+                <form method="post" action="/erp/paypal/sync" style="margin-top: 1rem;">
+                    <button class="button secondary">Jetzt synchronisieren</button>
+                </form>
+            {% endif %}
+        </section>
+
+        {% if transactions %}
+            <section class="panel">
+                <div class="panel-title">
+                    <h2>Letzte Transaktionen</h2>
+                    <span class="pill">{{ transactions|length }} Transaktionen</span>
+                </div>
+                {% for tx in transactions %}
+                    <div class="log">
+                        <span>
+                            <strong>{{ tx.payer_name or tx.payer_email or 'Unbekannt' }}</strong>
+                            <br>
+                            <small>
+                                {{ tx.transaction_date.strftime('%d.%m.%Y %H:%M') }} Uhr ·
+                                {{ tx.transaction_type }} ·
+                                Status: {{ tx.transaction_status }}
+                            </small>
+                            {% if tx.transaction_note %}
+                                <br><small>{{ tx.transaction_note }}</small>
+                            {% endif %}
+                        </span>
+                        <span class="actions">
+                            <strong style="font-size: 1.2rem; {% if tx.net_amount_cents > 0 %}color: #2e7d32{% else %}color: #d32f2f{% endif %}">
+                                {% if tx.net_amount_cents > 0 %}+{% endif %}{{ (tx.net_amount_cents / 100)|round(2) }} {{ tx.transaction_currency }}
+                            </strong>
+                            <br>
+                            {% if tx.fee_amount_cents > 0 %}
+                                <small class="muted">Gebühr: -{{ (tx.fee_amount_cents / 100)|round(2) }} €</small>
+                            {% endif %}
+                            <br>
+                            {% if tx.processed %}
+                                <span class="approved">Verarbeitet</span>
+                            {% else %}
+                                <span class="pill">Neu</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                {% endfor %}
+            </section>
+        {% else %}
+            <section class="panel">
+                <p class="muted">Noch keine Transaktionen synchronisiert. Konfiguriere PayPal und klicke auf "Jetzt synchronisieren".</p>
+            </section>
+        {% endif %}
+
+        <section class="panel">
+            <h2>Anleitung: PayPal API-Credentials erstellen</h2>
+            <ol style="line-height: 1.8;">
+                <li>Gehe zu <a href="https://developer.paypal.com/dashboard" target="_blank">developer.paypal.com/dashboard</a></li>
+                <li>Melde dich mit deinem PayPal-Konto an</li>
+                <li>Klicke auf "Apps & Credentials"</li>
+                <li>Wähle "Sandbox" für Tests oder "Live" für Produktion</li>
+                <li>Klicke auf "Create App"</li>
+                <li>Gib einen App-Namen ein (z.B. "ABoroDesk ERP")</li>
+                <li>Kopiere die <strong>Client ID</strong> und das <strong>Secret</strong></li>
+                <li>Füge die Credentials oben im Formular ein</li>
+            </ol>
+            <p style="margin-top: 1rem;">
+                <strong>Hinweis:</strong> Für automatische Lizenzvergebung können später Webhooks eingerichtet werden.
+                Diese benachrichtigen das System sofort bei Zahlungseingängen.
+            </p>
+        </section>
+    </main>
+</body>
+</html>

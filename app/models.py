@@ -628,3 +628,34 @@ class ErpPayment(Base):
     reference: Mapped[str] = mapped_column(String(240), default="")
     reverses_payment_id: Mapped[int | None] = mapped_column(ForeignKey("erp_payments.id"), nullable=True, unique=True)
     recorded_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+
+
+class PayPalTransaction(Base):
+    __tablename__ = "paypal_transactions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    transaction_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    transaction_type: Mapped[str] = mapped_column(String(40))
+    transaction_status: Mapped[str] = mapped_column(String(40))
+    transaction_amount_cents: Mapped[int] = mapped_column()
+    transaction_currency: Mapped[str] = mapped_column(String(3), default="EUR")
+    fee_amount_cents: Mapped[int] = mapped_column(default=0)
+    net_amount_cents: Mapped[int] = mapped_column()
+    payer_email: Mapped[str] = mapped_column(String(320), default="")
+    payer_name: Mapped[str] = mapped_column(String(240), default="")
+    transaction_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    transaction_note: Mapped[str] = mapped_column(Text, default="")
+    raw_data: Mapped[str] = mapped_column(Text, default="{}")
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    processed: Mapped[bool] = mapped_column(Boolean, default=False)
+    erp_document_id: Mapped[int | None] = mapped_column(ForeignKey("erp_documents.id"), nullable=True)
+
+
+class PayPalConfig(Base):
+    __tablename__ = "paypal_config"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    environment: Mapped[str] = mapped_column(String(20), default="sandbox")
+    client_id: Mapped[str] = mapped_column(String(255), default="")
+    client_secret_encrypted: Mapped[str] = mapped_column(Text, default="")
+    webhook_id: Mapped[str] = mapped_column(String(255), default="")
+    last_sync: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)

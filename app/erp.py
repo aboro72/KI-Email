@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.models import AuditLog, CommercialDocument, ErpCustomer, ErpItem, ErpPayment
-from app.security import require_permission, require_user
+from app.models import AuditLog, CommercialDocument, ErpCustomer, ErpItem, ErpPayment, PayPalConfig, PayPalTransaction
+from app.security import decrypt_secret, encrypt_secret, require_permission, require_user
 
 router = APIRouter(prefix="/erp", tags=["ERP"])
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -194,3 +194,108 @@ def toggle_erp_item(item_id: int, request: Request, db: Session = Depends(get_db
     db.commit()
 
     return RedirectResponse(f"/erp/items?message={quote(f'Artikel {item.name} wurde {status}')}", status_code=303)
+
+
+@router.get("/paypal", response_class=HTMLResponse)
+def paypal_overview(request: Request, db: Session = Depends(get_db)):
+    """PayPal-Transaktionsübersicht und Konfiguration."""
+    if not get_settings().erp_enabled:
+        raise HTTPException(404, "Das ERP-Modul ist deaktiviert.")
+
+    user = require_user(request, db)
+    require_permission(user, "ERP_VIEW")
+
+    config = db.scalar(select(PayPalConfig).limit(1))
+    if not config:
+        config = PayPalConfig()
+        db.add(config)
+        db.commit()
+
+    transactions = db.scalars(
+        select(PayPalTransaction)
+        .order_by(PayPalTransaction.transaction_date.desc())
+        .limit(50)
+    ).all()
+
+    # Statistiken
+    total_received = db.scalar(
+        select(func.sum(PayPalTransaction.net_amount_cents))
+        .where(PayPalTransaction.net_amount_cents > 0)
+    ) or 0
+
+    total_sent = db.scalar(
+        select(func.sum(PayPalTransaction.net_amount_cents))
+        .where(PayPalTransaction.net_amount_cents < 0)
+    ) or 0
+
+    unprocessed_count = db.scalar(
+        select(func.count(PayPalTransaction.id))
+        .where(PayPalTransaction.processed == False)
+    ) or 0
+
+    return templates.TemplateResponse(
+        request=request,
+        name="erp_paypal.html",
+        context={
+            "user": user,
+            "config": config,
+            "transactions": transactions,
+            "total_received_euros": abs(total_received) / 100,
+            "total_sent_euros": abs(total_sent) / 100,
+            "balance_euros": (total_received + total_sent) / 100,
+            "unprocessed_count": unprocessed_count,
+            "message": request.query_params.get("message"),
+        }
+    )
+
+
+@router.post("/paypal/config")
+def update_paypal_config(
+    request: Request,
+    environment: str = Form(...),
+    client_id: str = Form(...),
+    client_secret: str = Form(""),
+    webhook_id: str = Form(""),
+    enabled: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    """PayPal-Konfiguration aktualisieren."""
+    user = require_user(request, db)
+    require_permission(user, "ERP_MANAGE")
+
+    config = db.scalar(select(PayPalConfig).limit(1))
+    if not config:
+        config = PayPalConfig()
+        db.add(config)
+
+    config.environment = environment
+    config.client_id = client_id.strip()
+
+    if client_secret:
+        config.client_secret_encrypted = encrypt_secret(client_secret)
+
+    config.webhook_id = webhook_id.strip()
+    config.enabled = enabled
+
+    db.add(AuditLog(action="PAYPAL_CONFIG_UPDATED", actor_user_id=user.id, details=f'{{"environment": "{environment}", "enabled": {str(enabled).lower()}}}'))
+    db.commit()
+
+    return RedirectResponse(f"/erp/paypal?message={quote('PayPal-Konfiguration wurde aktualisiert')}", status_code=303)
+
+
+@router.post("/paypal/sync")
+def sync_paypal_transactions(request: Request, db: Session = Depends(get_db)):
+    """Transaktionen von PayPal synchronisieren."""
+    user = require_user(request, db)
+    require_permission(user, "ERP_MANAGE")
+
+    config = db.scalar(select(PayPalConfig).limit(1))
+    if not config or not config.enabled:
+        return RedirectResponse("/erp/paypal?message=PayPal+nicht+konfiguriert", status_code=303)
+
+    try:
+        from app.paypal_integration import fetch_transactions
+        count = fetch_transactions(config, db)
+        return RedirectResponse(f"/erp/paypal?message={quote(f'{count} Transaktionen synchronisiert')}", status_code=303)
+    except Exception as e:
+        return RedirectResponse(f"/erp/paypal?message={quote(f'Fehler: {str(e)}')}", status_code=303)
