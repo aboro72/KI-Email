@@ -663,6 +663,7 @@ class PayPalConfig(Base):
 
 class License(Base):
     __tablename__ = "licenses"
+    __table_args__ = {'extend_existing': True}
     id: Mapped[int] = mapped_column(primary_key=True)
     license_key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     product_sku: Mapped[str] = mapped_column(String(80), index=True)
@@ -685,6 +686,7 @@ class License(Base):
 
 class LicenseActivation(Base):
     __tablename__ = "license_activations"
+    __table_args__ = {'extend_existing': True}
     id: Mapped[int] = mapped_column(primary_key=True)
     license_id: Mapped[int] = mapped_column(ForeignKey("licenses.id"), index=True)
     activation_token: Mapped[str] = mapped_column(String(80), unique=True)
@@ -695,23 +697,3 @@ class LicenseActivation(Base):
     hostname: Mapped[str] = mapped_column(String(255), default="")
     product_version: Mapped[str] = mapped_column(String(40), default="")
     status: Mapped[str] = mapped_column(String(20), default="active")
-
-
-class MarketingCampaign(Base):
-    __tablename__ = "marketing_campaigns"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(240))
-    campaign_type: Mapped[str] = mapped_column(String(40), default="email")
-    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
-    subject: Mapped[str] = mapped_column(String(240), default="")
-    body_text: Mapped[str] = mapped_column(Text, default="")
-    body_html: Mapped[str] = mapped_column(Text, default="")
-    target_products: Mapped[str] = mapped_column(String(255), default="")
-    target_segment: Mapped[str] = mapped_column(String(80), default="all")
-    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    recipients_count: Mapped[int] = mapped_column(default=0)
-    opened_count: Mapped[int] = mapped_column(default=0)
-    clicked_count: Mapped[int] = mapped_column(default=0)
-    created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
