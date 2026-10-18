@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Artikel · ERP</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .item-edit {
+            border-top: 1px solid #e5ebf2;
+            padding: 1rem 0;
+        }
+        .item-edit summary {
+            cursor: pointer;
+            font-weight: 700;
+            color: #1769aa;
+        }
+    </style>
+    <script src="/ui-language.js" defer></script>
+    <script src="/static/i18n-catalog.js?v=20261002" defer></script>
+    <script src="/static/i18n.js?v=20261002" defer></script>
+</head>
+<body>
+    <header>
+        <a class="brand" href="/dashboard">AboroDesk</a>
+        {% include '_grouped_nav.html' %}
+    </header>
+    <main class="shell">
+        {% if message %}
+            <section class="notice">{{ message }}</section>
+        {% endif %}
+
+        <div class="intro">
+            <div>
+                <span class="eyebrow">ERP · Artikelverwaltung</span>
+                <h1>Artikel & Produkte</h1>
+                <p>Verwalte Produkte, Dienstleistungen und deren Preise.</p>
+            </div>
+            <div>
+                <a class="button" href="/erp">← Zurück zur ERP-Übersicht</a>
+            </div>
+        </div>
+
+        <section class="panel">
+            <div class="panel-title">
+                <h2>Vorhandene Artikel</h2>
+                <span class="pill">{{ items|length }} Artikel</span>
+            </div>
+            {% for item in items %}
+                <details class="item-edit">
+                    <summary>
+                        {{ item.name }} ({{ item.sku }}) ·
+                        {{ (item.price_cents / 100)|round(2) }} €
+                        {% if item.active %}
+                            <span class="approved">aktiv</span>
+                        {% else %}
+                            <span class="pill">inaktiv</span>
+                        {% endif %}
+                    </summary>
+                    <form method="post" action="/erp/items/{{ item.id }}" class="account-form">
+                        <label>
+                            SKU / Artikelnummer
+                            <input name="sku" value="{{ item.sku }}" required>
+                        </label>
+                        <label>
+                            Artikelname
+                            <input name="name" value="{{ item.name }}" required>
+                        </label>
+                        <label>
+                            Einheit
+                            <input name="unit" value="{{ item.unit }}" required>
+                        </label>
+                        <label>
+                            Preis (€)
+                            <input name="price_euros" type="number" step="0.01" value="{{ (item.price_cents / 100)|round(2) }}" required>
+                        </label>
+                        <label>
+                            Steuersatz (%)
+                            <input name="tax_percent" type="number" step="0.01" value="{{ (item.tax_basis_points / 100)|round(2) }}" required>
+                        </label>
+                        <button class="button">Änderungen speichern</button>
+                    </form>
+                    <form method="post" action="/erp/items/{{ item.id }}/toggle">
+                        <button class="button secondary">
+                            {% if item.active %}Deaktivieren{% else %}Aktivieren{% endif %}
+                        </button>
+                    </form>
+                </details>
+            {% else %}
+                <p class="muted">Noch keine Artikel angelegt.</p>
+            {% endfor %}
+        </section>
+
+        <section class="panel">
+            <h2>Neuen Artikel anlegen</h2>
+            <form method="post" action="/erp/items" class="account-form">
+                <label>
+                    SKU / Artikelnummer
+                    <input name="sku" placeholder="z.B. ABOLMS-2024" required>
+                </label>
+                <label>
+                    Artikelname
+                    <input name="name" placeholder="z.B. ABoroLMS Standard" required>
+                </label>
+                <label>
+                    Einheit
+                    <input name="unit" value="Stück" required>
+                    <small class="muted">z.B. Stück, Lizenz, Monat, Stunde</small>
+                </label>
+                <label>
+                    Preis (€)
+                    <input name="price_euros" type="number" step="0.01" value="0.00" required>
+                </label>
+                <label>
+                    Steuersatz (%)
+                    <input name="tax_percent" type="number" step="0.01" value="19.00" required>
+                    <small class="muted">Deutschland: 19% (Standard) oder 7% (ermäßigt)</small>
+                </label>
+                <button class="button">Artikel speichern</button>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2>ABoroSoft Produktvorschläge</h2>
+            <p class="muted">Hier sind eure Hauptprodukte als Vorschläge. Passt die Preise an und legt sie über das Formular oben an:</p>
+            <div class="log">
+                <span>
+                    <strong>ABoroLMS</strong> (Lernplattform)<br>
+                    <small>SKU: ABOLMS-STD · Einheit: Lizenz</small>
+                </span>
+            </div>
+            <div class="log">
+                <span>
+                    <strong>CloudShare</strong> (Dateiaustausch)<br>
+                    <small>SKU: CLOUDSHARE-STD · Einheit: Lizenz</small>
+                </span>
+            </div>
+            <div class="log">
+                <span>
+                    <strong>HelpDesk</strong> (Support/Ticketsystem)<br>
+                    <small>SKU: HELPDESK-STD · Einheit: Lizenz</small>
+                </span>
+            </div>
+            <div class="log">
+                <span>
+                    <strong>Nova</strong> (Sicherheitsprüfungen)<br>
+                    <small>SKU: NOVA-STD · Einheit: Lizenz</small>
+                </span>
+            </div>
+            <div class="log">
+                <span>
+                    <strong>ABoroOffice</strong> (Prozessintegration)<br>
+                    <small>SKU: ABOOFFICE-STD · Einheit: Lizenz</small>
+                </span>
+            </div>
+            <div class="log">
+                <span>
+                    <strong>Beratung & Support</strong><br>
+                    <small>SKU: CONSULTING · Einheit: Stunde</small>
+                </span>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
