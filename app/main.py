@@ -1759,3 +1759,28 @@ def validate_license_api(request: Request):
 
     validation = validate_local_license()
     return JSONResponse(validation)
+
+
+@app.get("/license/debug")
+def debug_license_db(db: Session = Depends(get_db)):
+    """Debug-Endpunkt um DB-Status zu prüfen."""
+    from sqlalchemy import func, text
+    from app.models import License
+    from app.db import engine
+
+    # Zähle Lizenzen
+    count = db.scalar(select(func.count(License.id)))
+
+    # Hole alle Lizenzschlüssel
+    licenses = db.scalars(select(License)).all()
+    license_keys = [lic.license_key for lic in licenses]
+
+    # DB Info
+    db_url = str(engine.url)
+
+    return JSONResponse({
+        "database_url": db_url,
+        "license_count": count,
+        "license_keys": license_keys,
+        "engine_type": str(type(engine)),
+    })
