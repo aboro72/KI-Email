@@ -108,7 +108,17 @@ def validate_license(db: Session, license_key: str, product_sku: str) -> dict:
     Returns:
         dict mit Status und Details
     """
+    # Debug: Zähle alle Lizenzen
+    from sqlalchemy import func
+    total_count = db.scalar(select(func.count(License.id)))
+    print(f"[DEBUG] validate_license: Searching for '{license_key}' in product '{product_sku}'")
+    print(f"[DEBUG] Total licenses in DB: {total_count}")
+
     license = db.scalar(select(License).where(License.license_key == license_key))
+
+    print(f"[DEBUG] License found: {license is not None}")
+    if license:
+        print(f"[DEBUG] License details: product={license.product_sku}, status={license.status}")
 
     if not license:
         return {"valid": False, "reason": "License key not found"}

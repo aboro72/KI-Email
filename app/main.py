@@ -1719,11 +1719,19 @@ async def activate_license_local(request: Request, db: Session = Depends(get_db)
 
     product_sku = get_product_sku()
 
+    # Debug-Logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"License activation attempt: key={license_key}, product={product_sku}")
+
     # Lizenz gegen zentrale Datenbank validieren
     validation = validate_license(db, license_key, product_sku)
 
+    logger.info(f"Validation result: {validation}")
+
     if not validation["valid"]:
         reason = validation.get("reason", "Unbekannter Fehler")
+        logger.error(f"License validation failed: {reason}")
         return RedirectResponse(f"/license?error={quote(f'Lizenz ungültig: {reason}')}", status_code=303)
 
     # Lizenz ist gültig: Lokal speichern
