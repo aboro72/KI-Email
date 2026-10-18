@@ -350,11 +350,11 @@ async def license_check(request: Request, call_next):
 async def request_protection(request: Request, call_next):
     csrf_cookie = request.cookies.get("ki_email_csrf")
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-        # Webhooks von externen Diensten (PayPal, etc.) vom CSRF-Schutz ausnehmen
-        webhook_paths = ["/erp/paypal/webhook"]
-        is_webhook = any(request.url.path == path for path in webhook_paths)
+        # Webhooks und Lizenz-Aktivierung vom CSRF-Schutz ausnehmen
+        exempt_paths = ["/erp/paypal/webhook", "/license/activate"]
+        is_exempt = any(request.url.path == path for path in exempt_paths)
 
-        if not is_webhook:
+        if not is_exempt:
             client = request.client.host if request.client else "unknown"
             limit, window = _rate_limit_for(request.url.path)
             if not rate_limiter.allow(f"{client}:{request.url.path}", limit, window):
